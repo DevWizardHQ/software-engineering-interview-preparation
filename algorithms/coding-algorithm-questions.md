@@ -22,7 +22,7 @@
 
 ## Arrays and Hashing
 
-### Q1. Two Sum.
+## Q1. Two Sum.
 
 **Problem:** Given an array of integers and a target, return indices of the two numbers that add to the target.
 
@@ -56,7 +56,7 @@ def two_sum(nums, target):
 
 ---
 
-### Q2. Three Sum.
+## Q2. Three Sum.
 
 **Problem:** Find all unique triplets that sum to zero.
 
@@ -86,7 +86,7 @@ function threeSum(nums) {
 
 ---
 
-### Q3. Find duplicates in an array.
+## Q3. Find duplicates in an array.
 
 **Return whether any duplicate exists:**
 ```javascript
@@ -121,7 +121,7 @@ Mark-as-negative trick: each value flips the sign at its target index. Second vi
 
 ---
 
-### Q4. Find the missing number from 1..N.
+## Q4. Find the missing number from 1..N.
 
 **Sum formula (cleanest):**
 ```javascript
@@ -144,7 +144,7 @@ function missingNumber(nums) {
 
 ---
 
-### Q5. Maximum subarray sum (Kadane's algorithm).
+## Q5. Maximum subarray sum (Kadane's algorithm).
 
 ```javascript
 function maxSubArray(nums) {
@@ -161,7 +161,7 @@ function maxSubArray(nums) {
 
 ---
 
-### Q6. Group anagrams.
+## Q6. Group anagrams.
 
 ```javascript
 function groupAnagrams(strs) {
@@ -181,7 +181,7 @@ Faster key: count of 26 letters (no sort) → O(n · k).
 
 ---
 
-### Q7. Top K frequent elements.
+## Q7. Top K frequent elements.
 
 ```javascript
 function topKFrequent(nums, k) {
@@ -206,7 +206,7 @@ function topKFrequent(nums, k) {
 
 ## Two Pointers
 
-### Q8. Reverse a string in place.
+## Q8. Reverse a string in place.
 
 ```javascript
 function reverseString(s) {
@@ -223,7 +223,7 @@ function reverseString(s) {
 
 ---
 
-### Q9. Palindrome check (alphanumeric only).
+## Q9. Palindrome check (alphanumeric only).
 
 ```javascript
 function isPalindrome(s) {
@@ -242,7 +242,7 @@ function isPalindrome(s) {
 
 ---
 
-### Q10. Container with most water.
+## Q10. Container with most water.
 
 ```javascript
 function maxArea(height) {
@@ -260,7 +260,7 @@ Greedy: always move the shorter side; only it can possibly improve the area. **O
 
 ---
 
-### Q11. Merge two sorted arrays.
+## Q11. Merge two sorted arrays.
 
 ```javascript
 function merge(a, b) {
@@ -289,7 +289,7 @@ function mergeInPlace(a, m, b, n) {
 
 ## Sliding Window
 
-### Q12. Longest substring without repeating characters.
+## Q12. Longest substring without repeating characters.
 
 ```javascript
 function lengthOfLongestSubstring(s) {
@@ -310,7 +310,7 @@ function lengthOfLongestSubstring(s) {
 
 ---
 
-### Q13. Maximum sum subarray of size K.
+## Q13. Maximum sum subarray of size K.
 
 ```javascript
 function maxSumK(nums, k) {
@@ -329,7 +329,7 @@ function maxSumK(nums, k) {
 
 ---
 
-### Q14. Minimum window substring.
+## Q14. Minimum window substring.
 
 ```javascript
 function minWindow(s, t) {
@@ -362,7 +362,7 @@ function minWindow(s, t) {
 
 ## Strings
 
-### Q15. Check if two strings are anagrams.
+## Q15. Check if two strings are anagrams.
 
 ```javascript
 function isAnagram(a, b) {
@@ -380,7 +380,7 @@ function isAnagram(a, b) {
 
 ---
 
-### Q16. Reverse words in a string.
+## Q16. Reverse words in a string.
 
 ```javascript
 const reverseWords = s => s.trim().split(/\s+/).reverse().join(' ');
@@ -390,7 +390,7 @@ In-place version (O(1) extra space) reverses the entire string then reverses eac
 
 ---
 
-### Q17. Valid palindrome — allow one deletion.
+## Q17. Valid palindrome — allow one deletion.
 
 ```javascript
 function validPalindrome(s) {
@@ -411,7 +411,7 @@ function validPalindrome(s) {
 
 ## Searching and Sorting
 
-### Q18. Binary search.
+## Q18. Binary search.
 
 ```javascript
 function binarySearch(nums, target) {
@@ -434,7 +434,7 @@ function binarySearch(nums, target) {
 
 ---
 
-### Q19. Search in rotated sorted array.
+## Q19. Search in rotated sorted array.
 
 ```javascript
 function search(nums, target) {
@@ -456,7 +456,7 @@ function search(nums, target) {
 
 ---
 
-### Q20. Quick sort.
+## Q20. Quick sort.
 
 ```javascript
 function quickSort(arr, lo = 0, hi = arr.length - 1) {
@@ -487,7 +487,7 @@ Mitigations: random pivot, median-of-three, fall back to heapsort (introsort).
 
 ---
 
-### Q21. Merge sort.
+## Q21. Merge sort.
 
 ```javascript
 function mergeSort(arr) {
@@ -509,7 +509,7 @@ function merge(a, b) {
 
 ---
 
-### Q22. Bubble sort.
+## Q22. Bubble sort.
 
 ```javascript
 function bubbleSort(arr) {
@@ -531,7 +531,7 @@ function bubbleSort(arr) {
 
 ---
 
-### Q23. Sort comparison table.
+## Q23. Sort comparison table.
 
 | Algorithm | Best | Average | Worst | Space | Stable | Notes |
 |-----------|------|---------|-------|-------|--------|-------|
@@ -550,7 +550,7 @@ JS `Array.prototype.sort` and Python `sorted` use **TimSort** — a hybrid of me
 
 ## Linked Lists
 
-### Q24. Reverse a singly linked list.
+## Q24. Reverse a singly linked list.
 
 ```javascript
 function reverseList(head) {
@@ -580,7 +580,7 @@ function reverseList(head) {
 
 ---
 
-### Q25. Detect a cycle (Floyd's tortoise & hare).
+## Q25. Detect a cycle (Floyd's tortoise & hare).
 
 ```javascript
 function hasCycle(head) {
@@ -615,7 +615,7 @@ function detectCycle(head) {
 
 ---
 
-### Q26. Find middle of a linked list.
+## Q26. Find middle of a linked list.
 
 ```javascript
 function middleNode(head) {
@@ -632,7 +632,7 @@ For even length, returns the second middle node. Adjust with `fast.next.next` ch
 
 ---
 
-### Q27. Merge two sorted linked lists.
+## Q27. Merge two sorted linked lists.
 
 ```javascript
 function mergeTwoLists(a, b) {
@@ -652,7 +652,7 @@ function mergeTwoLists(a, b) {
 
 ## Stacks and Queues
 
-### Q28. Valid parentheses.
+## Q28. Valid parentheses.
 
 ```javascript
 function isValid(s) {
@@ -673,7 +673,7 @@ function isValid(s) {
 
 ---
 
-### Q29. Daily temperatures (monotonic stack).
+## Q29. Daily temperatures (monotonic stack).
 
 ```javascript
 function dailyTemperatures(t) {
@@ -694,7 +694,7 @@ Classic monotonic stack — every index is pushed and popped at most once, **O(n
 
 ---
 
-### Q30. Implement queue using two stacks.
+## Q30. Implement queue using two stacks.
 
 ```javascript
 class Queue {
@@ -715,7 +715,7 @@ Amortised **O(1)** per operation: each element is moved at most once.
 
 ---
 
-### Q31. Min stack — push/pop/top/getMin all O(1).
+## Q31. Min stack — push/pop/top/getMin all O(1).
 
 ```javascript
 class MinStack {
@@ -734,7 +734,7 @@ class MinStack {
 
 ## Trees
 
-### Q32. Tree traversals (DFS in / pre / post).
+## Q32. Tree traversals (DFS in / pre / post).
 
 ```javascript
 function inorder(root, out = []) {
@@ -777,7 +777,7 @@ function inorderIterative(root) {
 
 ---
 
-### Q33. BFS / level-order traversal.
+## Q33. BFS / level-order traversal.
 
 ```javascript
 function levelOrder(root) {
@@ -801,7 +801,7 @@ function levelOrder(root) {
 
 ---
 
-### Q34. Validate a Binary Search Tree.
+## Q34. Validate a Binary Search Tree.
 
 ```javascript
 function isValidBST(root, min = -Infinity, max = Infinity) {
@@ -816,7 +816,7 @@ Pass down running min/max bounds — checking just immediate children fails for 
 
 ---
 
-### Q35. Lowest Common Ancestor (binary tree).
+## Q35. Lowest Common Ancestor (binary tree).
 
 ```javascript
 function lowestCommonAncestor(root, p, q) {
@@ -841,7 +841,7 @@ function lcaBST(root, p, q) {
 
 ---
 
-### Q36. Maximum depth of binary tree.
+## Q36. Maximum depth of binary tree.
 
 ```javascript
 function maxDepth(root) {
@@ -852,7 +852,7 @@ function maxDepth(root) {
 
 ---
 
-### Q37. Diameter of a binary tree.
+## Q37. Diameter of a binary tree.
 
 ```javascript
 function diameterOfBinaryTree(root) {
@@ -872,7 +872,7 @@ function diameterOfBinaryTree(root) {
 
 ## Recursion and Backtracking
 
-### Q38. Factorial.
+## Q38. Factorial.
 
 ```javascript
 const factIter = n => { let r = 1; for (let i = 2; i <= n; i++) r *= i; return r; };
@@ -883,7 +883,7 @@ Iterative is preferred (no stack growth). For very large n, use BigInt.
 
 ---
 
-### Q39. Fibonacci — four ways.
+## Q39. Fibonacci — four ways.
 
 ```javascript
 // 1. Naive recursion: O(2^n)
@@ -921,7 +921,7 @@ function fibI(n) {
 
 ---
 
-### Q40. Generate all permutations.
+## Q40. Generate all permutations.
 
 ```javascript
 function permute(nums) {
@@ -944,7 +944,7 @@ function permute(nums) {
 
 ---
 
-### Q41. Subsets (power set).
+## Q41. Subsets (power set).
 
 ```javascript
 function subsets(nums) {
@@ -968,7 +968,7 @@ function subsets(nums) {
 
 ## Dynamic Programming
 
-### Q42. Climbing stairs.
+## Q42. Climbing stairs.
 
 ```javascript
 function climbStairs(n) {
@@ -982,7 +982,7 @@ This is just Fibonacci. **O(n)** time, **O(1)** space.
 
 ---
 
-### Q43. Coin change (minimum coins).
+## Q43. Coin change (minimum coins).
 
 ```javascript
 function coinChange(coins, amount) {
@@ -1001,7 +1001,7 @@ function coinChange(coins, amount) {
 
 ---
 
-### Q44. Longest Increasing Subsequence.
+## Q44. Longest Increasing Subsequence.
 
 **O(n²) DP:**
 ```javascript
@@ -1036,7 +1036,7 @@ function lengthOfLIS(nums) {
 
 ---
 
-### Q45. House robber.
+## Q45. House robber.
 
 ```javascript
 function rob(nums) {
@@ -1050,7 +1050,7 @@ State: at each house decide rob (and skip previous) or skip.
 
 ---
 
-### Q46. Longest common subsequence.
+## Q46. Longest common subsequence.
 
 ```javascript
 function lcs(a, b) {
@@ -1070,7 +1070,7 @@ function lcs(a, b) {
 
 ---
 
-### Q47. Edit distance (Levenshtein).
+## Q47. Edit distance (Levenshtein).
 
 ```javascript
 function minDistance(a, b) {
@@ -1128,11 +1128,170 @@ function minDistance(a, b) {
 
 ---
 
-## Senior Interview Tips
+## More Problems
 
-1. **Clarify before coding** — input range, types, allowed mutations, return shape.
-2. **State complexity upfront** — both time and space.
-3. **Walk through a small example** — catches off-by-one bugs early.
-4. **Discuss trade-offs** — hash map (faster) vs sort (less memory), iterative vs recursive.
-5. **Test edge cases**: empty input, single element, all duplicates, sorted/reverse, negatives.
-6. **Don't memorise — pattern-match** — most problems reduce to: hashing, two pointers, sliding window, BFS/DFS, DP, or greedy.
+## Q48. Find the kth largest element in an array.
+
+**Problem:** Return the kth largest element without sorting the entire array.
+
+```javascript
+// Min-heap of size k — keep only the k largest values seen
+class MinHeap {
+  constructor() { this.h = []; }
+  size() { return this.h.length; }
+  peek() { return this.h[0]; }
+  push(v) {
+    this.h.push(v);
+    let i = this.h.length - 1;
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (this.h[p] <= this.h[i]) break;
+      [this.h[p], this.h[i]] = [this.h[i], this.h[p]];
+      i = p;
+    }
+  }
+  pop() {
+    const top = this.h[0];
+    const last = this.h.pop();
+    if (this.h.length) {
+      this.h[0] = last;
+      let i = 0;
+      while (true) {
+        const l = 2 * i + 1, r = 2 * i + 2;
+        let s = i;
+        if (l < this.h.length && this.h[l] < this.h[s]) s = l;
+        if (r < this.h.length && this.h[r] < this.h[s]) s = r;
+        if (s === i) break;
+        [this.h[s], this.h[i]] = [this.h[i], this.h[s]];
+        i = s;
+      }
+    }
+    return top;
+  }
+}
+
+function kthLargest(nums, k) {
+  const heap = new MinHeap();
+  for (const n of nums) {
+    heap.push(n);
+    if (heap.size() > k) heap.pop();
+  }
+  return heap.peek();
+}
+```
+
+| Approach | Time | Space |
+|----------|------|-------|
+| Sort | O(n log n) | O(1) |
+| Min-heap of size k | O(n log k) | O(k) |
+| Quickselect | O(n) avg, O(n²) worst | O(1) |
+
+---
+
+## Q49. Word search in a grid.
+
+**Problem:** Given a 2D board and a word, return true if the word exists in the grid (4-directional, each cell used at most once).
+
+```javascript
+function exist(board, word) {
+  const rows = board.length, cols = board[0].length;
+
+  function dfs(r, c, i) {
+    if (i === word.length) return true;
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return false;
+    if (board[r][c] !== word[i]) return false;
+
+    const tmp = board[r][c];
+    board[r][c] = '#'; // mark visited
+    const found = dfs(r + 1, c, i + 1) || dfs(r - 1, c, i + 1)
+               || dfs(r, c + 1, i + 1) || dfs(r, c - 1, i + 1);
+    board[r][c] = tmp;
+    return found;
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (dfs(r, c, 0)) return true;
+    }
+  }
+  return false;
+}
+```
+
+Time O(m·n·4^L), space O(L) where L is word length.
+
+---
+
+## Q50. Number of islands.
+
+**Problem:** Count connected groups of `'1'`s in a 2D grid (4-directional).
+
+```javascript
+function numIslands(grid) {
+  let count = 0;
+  const rows = grid.length, cols = grid[0].length;
+
+  function dfs(r, c) {
+    if (r < 0 || r >= rows || c < 0 || c >= cols || grid[r][c] !== '1') return;
+    grid[r][c] = '0';
+    dfs(r + 1, c); dfs(r - 1, c);
+    dfs(r, c + 1); dfs(r, c - 1);
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (grid[r][c] === '1') {
+        count++;
+        dfs(r, c);
+      }
+    }
+  }
+  return count;
+}
+```
+
+Time O(m·n), space O(m·n) for recursion in worst case.
+
+---
+
+## Q51. Best time to buy and sell stock.
+
+**Problem:** Given an array of daily prices, find the max profit from one buy and one sell.
+
+```javascript
+function maxProfit(prices) {
+  let minPrice = Infinity, maxProfit = 0;
+  for (const p of prices) {
+    minPrice = Math.min(minPrice, p);
+    maxProfit = Math.max(maxProfit, p - minPrice);
+  }
+  return maxProfit;
+}
+```
+
+Track the minimum price seen so far and the best profit if selling today. Time O(n), space O(1).
+
+---
+
+## Q52. Product of array except self.
+
+**Problem:** Return an array where `output[i]` is the product of all numbers except `nums[i]`. Cannot use division.
+
+```javascript
+function productExceptSelf(nums) {
+  const out = new Array(nums.length).fill(1);
+  let left = 1;
+  for (let i = 0; i < nums.length; i++) {
+    out[i] = left;
+    left *= nums[i];
+  }
+  let right = 1;
+  for (let i = nums.length - 1; i >= 0; i--) {
+    out[i] *= right;
+    right *= nums[i];
+  }
+  return out;
+}
+```
+
+Two passes: first stores prefix products, second multiplies by suffix products. Time O(n), space O(1) excluding output.

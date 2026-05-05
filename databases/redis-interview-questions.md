@@ -1,91 +1,99 @@
-# Redis Interview Questions — Basic to Advanced
+# Redis Interview Q&A — Basic to Advanced
 
-**Purpose:** Senior-level Redis knowledge for backend / full-stack interviews. Covers data structures, persistence, replication, cluster, eviction, and real production patterns (cache, sessions, rate limiting, queues, leaderboards, locks).
+**Purpose:** Practical Redis knowledge for backend and full-stack interviews. Each topic has a clear question, a plain-language answer, and runnable command examples.
 
 ---
 
 ## Table of Contents
 
-1. [Redis Basics](#redis-basics)
-2. [Data Structures](#data-structures)
-3. [Persistence (RDB and AOF)](#persistence-rdb-and-aof)
-4. [Pub/Sub and Streams](#pubsub-and-streams)
-5. [Transactions and Lua Scripting](#transactions-and-lua-scripting)
-6. [Replication, Sentinel, and Cluster](#replication-sentinel-and-cluster)
-7. [Memory and Eviction](#memory-and-eviction)
-8. [Production Use Cases](#production-use-cases)
-9. [Distributed Locks](#distributed-locks)
-10. [Redis vs Memcached](#redis-vs-memcached)
-11. [Common Gotchas](#common-gotchas)
-12. [Real Interview Scenarios](#real-interview-scenarios)
+1. Redis Basics
+2. Data Structures
+3. Persistence (RDB and AOF)
+4. Pub/Sub and Streams
+5. Transactions and Lua Scripting
+6. Replication, Sentinel, and Cluster
+7. Memory and Eviction
+8. Production Use Cases
+9. Distributed Locks
+10. Redis vs Memcached
+11. Common Gotchas
 
 ---
 
-## Redis Basics
+## 1. Redis Basics
 
-### Q1. What is Redis?
+## Q1. What is Redis?
 
-In-memory key-value data store. Single-threaded for command execution, very fast (sub-millisecond latency), supports rich data structures, persistence, replication, clustering, pub/sub, streams, scripting. Open-source. Recent versions: 7.x. Note: Redis Inc. relicensed Redis 7.4+ to RSALv2/SSPL; **Valkey** is the Linux Foundation BSD-licensed fork.
+**Answer:**
 
----
+Redis is an in-memory key-value data store. It is single-threaded for command execution but extremely fast (sub-millisecond latency), and it ships with rich data structures (lists, hashes, sets, sorted sets, streams, bitmaps), persistence, replication, clustering, pub/sub, and a scripting engine.
 
-### Q2. Why is Redis so fast?
+```
+SET name "Alice"
+GET name
+DEL name
+```
 
-- Entirely in memory — no disk on the critical path.
-- Single-threaded command execution — no lock contention.
-- Optimized data structures (e.g., specialized small-list encoding).
-- Non-blocking I/O multiplexing (epoll/kqueue).
-- Network round-trip is often the dominant cost — Redis itself responds in microseconds.
+Note: Redis Inc. relicensed Redis 7.4+ under RSALv2/SSPL. Valkey is the Linux Foundation BSD-licensed fork — the commands and concepts in this guide apply to both.
 
-Redis 6+ added I/O threads (multiple network threads but command execution still serialized).
+## Q2. Why is Redis so fast?
 
----
+**Answer:**
 
-### Q3. What's new in modern Redis (7.x)?
+- Everything is in memory; there is no disk on the critical path.
+- Command execution is single-threaded, so no locking is needed inside the server.
+- Optimized data structure encodings (small lists become listpacks, small sets become intsets).
+- Non-blocking I/O multiplexing (epoll, kqueue).
+- The network round-trip is often the dominant cost — the server itself often responds in microseconds.
 
-- **Functions** (server-side libraries, replacing scripts for some uses).
-- **Sharded pub/sub** (`SPUBLISH`, `SSUBSCRIBE`) for cluster.
-- **ACL v2** with selectors.
-- **Streams** maturity, consumer-group reclaim improvements.
-- **Multi-part AOF**.
-- **`CLIENT NO-EVICT`** and finer eviction tuning.
-- **`OBJECT FREQ`** for LFU debugging.
-- **`HEXPIRE`** family in 7.4 — TTL on individual hash fields.
+Redis 6 added I/O threads for the network layer, but command processing is still serialized.
 
----
+## Q3. What is new in modern Redis (7.x)?
 
-### Q4. Redis is single-threaded — does that limit throughput?
+**Answer:**
 
-Yes for CPU-bound work. A single Redis instance scales to ~100k-1M ops/sec depending on workload. Beyond that, you scale horizontally with **Redis Cluster** or by sharding at the app level.
+- Functions — server-side libraries, easier to manage than ad-hoc EVAL scripts.
+- Sharded pub/sub (`SPUBLISH` / `SSUBSCRIBE`) for cluster scaling.
+- ACL v2 with selectors.
+- Streams maturity, including improved consumer-group reclaim.
+- Multi-part AOF.
+- Per-field TTL on hashes (`HEXPIRE`, 7.4+).
+- `CLIENT NO-EVICT` and finer eviction tuning.
 
-I/O threads (6+) help with network-bound workloads. Heavy CPU commands (huge `LRANGE`, `KEYS *`, big Lua scripts) block everything else.
+## Q4. Does single-threaded mean Redis can't scale?
 
----
+**Answer:**
 
-### Q5. What data types does Redis support?
+A single Redis instance scales to roughly 100k-1M ops/sec depending on workload. Beyond that, scale horizontally with Redis Cluster or app-level sharding. Heavy CPU commands such as huge `LRANGE`, `KEYS *`, or long Lua scripts block everything else, so they should be avoided in production.
+
+## Q5. What data types does Redis support?
+
+**Answer:**
 
 | Type | Use cases |
 |------|-----------|
-| String | Cache, counters, JSON blobs, bitmaps, HyperLogLog |
+| String | Cache values, counters, JSON blobs, bitmaps |
 | List | Queues, stacks, recent items |
 | Hash | Object fields (user profile) |
 | Set | Unique items, tags, set algebra |
-| Sorted Set (ZSet) | Leaderboards, time-ordered events, priority queues |
-| Bitmap | Compact boolean arrays (presence, A/B flags) |
-| HyperLogLog | Approximate distinct counts at huge scale |
-| Stream | Append-only log, consumer groups |
+| Sorted Set | Leaderboards, time-ordered events, priority queues |
+| Bitmap | Compact boolean arrays |
+| HyperLogLog | Approximate distinct counts |
+| Stream | Append-only log with consumer groups |
 | Geo | Geospatial indexing (built on sorted sets) |
-| Bitfield | Multi-bit counters in one string |
-| JSON (module) | Native JSON via RedisJSON / Valkey-JSON |
-| Vector (module) | Vector similarity search (RediSearch) |
+| Bitfield | Multiple counters packed in one string |
+| JSON (module) | Native JSON via RedisJSON |
+| Vector (module) | Vector similarity search via RediSearch |
 
 ---
 
-## Data Structures
+## 2. Data Structures
 
-### Q6. Strings — what can they store?
+## Q6. What can a string store?
 
-Anything binary-safe up to **512 MB**. Cache values, integers (atomically incremented), serialized JSON, raw bytes (images small enough), bitmaps.
+**Answer:**
+
+Any binary-safe value up to 512 MB. Use it for cache values, integer counters (atomically incremented), serialized JSON, or small binary blobs.
 
 ```
 SET user:1 "{\"name\":\"Alice\"}"
@@ -94,32 +102,34 @@ GET user:1
 INCR pageviews:2025-05-05
 INCRBY orders:total 199
 
-SETEX session:abc 1800 "user_id=42"   # with TTL
-SET key val EX 60 NX                    # set if not exists, 60s TTL
+# Cache with TTL and only-if-not-exists
+SET session:abc "user_id=42" EX 1800 NX
+SETEX session:abc 1800 "user_id=42"
 ```
 
----
+## Q7. How are lists implemented?
 
-### Q7. Lists — how are they implemented?
+**Answer:**
 
-Doubly-linked list (older) / quicklist (modern: linked list of ziplists/listpacks). Push/pop at either end is O(1).
+A modern Redis list is a "quicklist" — a linked list of small array nodes (listpacks). Push and pop at either end are O(1).
 
 ```
 LPUSH queue "job1"
 RPUSH queue "job2"
 LPOP queue
-BRPOP queue 5            # blocking pop with 5s timeout
+BRPOP queue 5            # blocking pop, 5-second timeout
 LRANGE queue 0 -1        # all elements (avoid on huge lists)
 LLEN queue
+LTRIM queue 0 99         # keep only the most recent 100 items
 ```
 
-Use cases: simple queue, recent items list (cap with `LTRIM`).
+Common uses are simple FIFO queues and bounded "recent items" lists.
 
----
+## Q8. When should you use a hash?
 
-### Q8. Hashes — when to use?
+**Answer:**
 
-For storing object-like data with many small fields. Memory-efficient when small (encoded as listpack). Field-level operations.
+For object-shaped data with multiple small fields. Hashes are very memory-efficient when small (encoded as listpack) and let you update individual fields.
 
 ```
 HSET user:1 name "Alice" age 30 city "NYC"
@@ -127,119 +137,125 @@ HGET user:1 name
 HGETALL user:1
 HINCRBY user:1 age 1
 
-# Redis 7.4: per-field expiry
+# Per-field expiry (7.4+)
 HEXPIRE user:1 60 FIELDS 1 sessionToken
 ```
 
-Avoid huge hashes (millions of fields) — `HGETALL` becomes expensive and blocks.
+Avoid hashes with millions of fields — `HGETALL` on those is expensive and blocks the server.
 
----
+## Q9. What are sets used for?
 
-### Q9. Sets — what are they good for?
+**Answer:**
 
-Unordered, unique members. O(1) add/remove/test. Built-in set algebra.
+Unordered collections of unique members. O(1) add, remove, and membership test, plus built-in set algebra.
 
 ```
 SADD tags:post:1 "redis" "db" "cache"
 SISMEMBER tags:post:1 "redis"
+SCARD tags:post:1                 # count
+
 SINTER tags:post:1 tags:post:2     # intersection
 SDIFF  tags:post:1 tags:post:2     # difference
 SUNION tags:post:1 tags:post:2
-SCARD tags:post:1                  # count
 ```
 
-Use cases: tags, unique-visitors-today, friend lists, ACLs.
+Common uses: tags, "users seen today", friend lists, ACLs.
 
----
+## Q10. Why are sorted sets so useful?
 
-### Q10. Sorted sets — why are they so useful?
+**Answer:**
 
-Sets where every member has a score; kept sorted by score. O(log N) add/update/remove. Range queries by score or rank.
+A sorted set is a set where every member has a numeric score, and members are kept ordered by score. Add/update/remove are O(log N), and you can query by score or by rank.
 
 ```
 ZADD leaderboard 1500 "alice" 1800 "bob" 1300 "carol"
 ZINCRBY leaderboard 100 "alice"
+
 ZREVRANGE leaderboard 0 9 WITHSCORES         # top 10
-ZREVRANK leaderboard "bob"                    # bob's rank
-ZRANGEBYSCORE leaderboard 1000 2000           # range by score
-ZRANGEBYLEX  alphabet "[a" "[m"               # range by lex when scores equal
+ZREVRANK  leaderboard "bob"                  # bob's rank (0-based)
+ZRANGEBYSCORE leaderboard 1000 2000          # range by score
 ```
 
-Use cases: leaderboards, time-series indexes (score = timestamp), priority queues, throttling windows.
+Common uses: leaderboards, time-series indexes (score = timestamp), priority queues, sliding-window rate limiters.
 
----
+## Q11. What is a bitmap and when is it useful?
 
-### Q11. Bitmaps?
+**Answer:**
 
-Strings interpreted as bit arrays. Massive memory efficiency for boolean state.
+A string interpreted as an array of bits. Extremely memory-efficient for boolean state.
 
 ```
 SETBIT users:active:2025-05-05 12345 1
 GETBIT users:active:2025-05-05 12345
-BITCOUNT users:active:2025-05-05         # how many active users
-BITOP AND ... ...                         # set algebra over days
+BITCOUNT users:active:2025-05-05
+BITOP AND active:both users:active:2025-05-04 users:active:2025-05-05
 ```
 
-Tracking 100M users for one day = 12.5 MB. Excellent for daily-active tracking, feature flags by user id.
+Tracking 100 million users for one day takes only about 12.5 MB. Great for daily-active tracking and per-user feature flags.
 
----
+## Q12. What is HyperLogLog?
 
-### Q12. HyperLogLog?
+**Answer:**
 
-Probabilistic data structure for counting distinct elements. ~12 KB per HLL gives <1% error for billions of distinct values.
+A probabilistic data structure that estimates the count of distinct elements with about 1% error using only ~12 KB regardless of cardinality.
 
 ```
 PFADD visitors:2025-05-05 "user-1" "user-2" "user-1"
 PFCOUNT visitors:2025-05-05
-PFMERGE visitors:may 2025-05-01 2025-05-02 ... 2025-05-31
+PFMERGE visitors:may visitors:2025-05-01 visitors:2025-05-02
 ```
 
-Use when you need approximate distinct count (uniques per minute), not exact membership.
+Use it when you need approximate distinct counts at scale (uniques per minute, uniques per region).
 
----
+## Q13. When do you use Streams instead of Lists or Pub/Sub?
 
-### Q13. Streams — when use them over lists or pub/sub?
+**Answer:**
 
-Append-only log with consumer groups, persistence, message acknowledgement, replay.
+A Stream is an append-only log with consumer groups, persistence, message acknowledgment, and replay — closest to a lightweight Kafka.
 
 ```
 XADD events * type "purchase" userId "42" amount 99
-XREAD COUNT 10 STREAMS events 0          # read from start
+XREAD COUNT 10 STREAMS events 0
 
-# Consumer groups (like Kafka)
+# Consumer groups
 XGROUP CREATE events processors $ MKSTREAM
 XREADGROUP GROUP processors consumer1 COUNT 10 STREAMS events >
-XACK events processors <id>
-XPENDING events processors                # unacked messages
-XCLAIM events processors consumer2 60000 <id>   # take over from dead consumer
+XACK events processors 1683216900000-0
+XPENDING events processors                   # un-acked messages
+XCLAIM events processors consumer2 60000 1683216900000-0
 ```
 
-Versus:
-- **Pub/Sub**: fire-and-forget, no persistence, no replay.
-- **Lists**: simpler queue but no consumer groups, no acks.
-- **Streams**: durable, replayable, parallel consumers — closest to a lightweight Kafka.
+| Need | Use |
+|------|-----|
+| Ephemeral broadcast | Pub/Sub |
+| Simple queue, single consumer | List + `BRPOP` |
+| Durable queue with multiple consumers, acks, replay | Streams |
+| Heavy throughput, multi-region, ordering | Real broker (Kafka) |
 
----
+## Q14. How do Geo commands work?
 
-### Q14. Geo commands?
+**Answer:**
 
-Stored as sorted sets with geohash scores.
+Geo data is stored as a sorted set with geohash scores. You can add points and query by distance or radius.
 
 ```
-GEOADD places 13.361389 38.115556 "Palermo" 15.087269 37.502669 "Catania"
+GEOADD places 13.361389 38.115556 "Palermo"
+GEOADD places 15.087269 37.502669 "Catania"
+
 GEODIST places "Palermo" "Catania" km
 GEOSEARCH places FROMLONLAT 15 37 BYRADIUS 200 km ASC COUNT 10
 ```
 
-Practical for "find nearby" features without pulling in PostGIS.
+Practical for "find nearby" features without bringing in PostGIS.
 
----
+## Q15. What do RedisJSON and RediSearch add?
 
-### Q15. RedisJSON and RediSearch — what do they add?
+**Answer:**
 
-Modules (or built-in in Redis Stack):
-- **RedisJSON**: native JSON values with path operations (`JSON.SET`, `JSON.GET`, `JSON.ARRAPPEND`).
-- **RediSearch**: secondary indexes, full-text search, vector similarity search.
+Optional modules (built into Redis Stack):
+
+- RedisJSON — native JSON values with path operations.
+- RediSearch — secondary indexes, full-text search, vector similarity search.
 
 ```
 JSON.SET user:1 $ '{"name":"Alice","age":30}'
@@ -249,77 +265,77 @@ FT.CREATE idx:users ON JSON SCHEMA $.name AS name TEXT $.age AS age NUMERIC
 FT.SEARCH idx:users "@age:[20 40] alice"
 ```
 
-Useful for caching JSON without round-tripping serialization, and for in-memory search/vector workloads.
-
 ---
 
-## Persistence (RDB and AOF)
+## 3. Persistence (RDB and AOF)
 
-### Q16. What persistence options does Redis offer?
+## Q16. What persistence options does Redis offer?
 
-| Option | What |
-|--------|------|
-| RDB | Periodic point-in-time snapshots (binary file) |
+**Answer:**
+
+| Option | What it does |
+|--------|--------------|
+| RDB | Periodic point-in-time binary snapshots |
 | AOF | Append-only log of every write |
-| Both (recommended) | RDB for backups, AOF for low data loss |
-| None | Pure cache, accept loss |
+| Both | Recommended for durable workloads |
+| None | Pure cache; accept loss |
 
----
+## Q17. How does RDB work?
 
-### Q17. How does RDB work?
+**Answer:**
 
-Fork a child process; the child writes the dataset to disk while the parent serves traffic. Tunable thresholds:
+Redis forks a child process; the child writes a snapshot of the dataset to disk while the parent continues serving traffic. Thresholds in the config control when snapshots happen.
 
 ```
-save 900 1        # snapshot if 1 key changed in 900s
-save 300 10       # snapshot if 10 keys changed in 300s
-save 60  10000    # snapshot if 10k keys changed in 60s
+# redis.conf
+save 900 1        # snapshot if 1 key changed in 900 seconds
+save 300 10       # snapshot if 10 keys changed in 300 seconds
+save 60  10000    # snapshot if 10k keys changed in 60 seconds
 ```
 
-**Pros:** compact, fast restart, great for backups.
-**Cons:** data since the last snapshot is lost on crash. Fork can be expensive on huge datasets (memory copy-on-write).
+Pros: compact files, fast restart, ideal for backups.
+Cons: data since the last snapshot is lost on a crash. The fork can be expensive on huge datasets.
+
+## Q18. How does AOF work?
+
+**Answer:**
+
+Every write is appended to an on-disk log. On restart, Redis replays the log to rebuild state.
+
+The `appendfsync` policy controls how often the log is fsynced to disk:
+
+| Setting | Behavior |
+|---------|----------|
+| `always` | fsync on every write — safest, slowest |
+| `everysec` | fsync once a second — default; up to 1s loss |
+| `no` | let the OS decide — fastest, biggest loss window |
+
+AOF rewrite compacts the log periodically. Redis 7 added multi-part AOF (a base file plus incremental files).
+
+## Q19. RDB or AOF — which should you use in production?
+
+**Answer:**
+
+Use both for durable workloads.
+
+- RDB gives quick restarts and convenient offsite backups.
+- AOF (`everysec`) limits crash data loss to about one second.
+
+Redis can replay both at startup; AOF takes precedence for recovery. For pure caches where data loss is acceptable, disable both for maximum performance.
+
+## Q20. Can persistence cause latency spikes?
+
+**Answer:**
+
+Yes. The fork for an RDB snapshot or AOF rewrite stalls the process briefly. With huge memory, the stall can be noticeable. AOF fsyncs on slow disks can also cause write stalls. Disable Transparent Huge Pages on Linux — they amplify fork copy-on-write cost. A common mitigation is to do persistence on a replica and keep the primary RDB-less.
 
 ---
 
-### Q18. How does AOF work?
+## 4. Pub/Sub and Streams
 
-Every write is appended to an on-disk log. On restart, Redis replays the log.
+## Q21. How does Pub/Sub work?
 
-`appendfsync` policies:
-- `always` — fsync after every write (safest, slowest).
-- `everysec` — fsync once a second (default; ≤1s data loss).
-- `no` — let the OS decide (fastest, biggest loss window).
-
-AOF rewrite compacts the file periodically. Redis 7 introduced **multi-part AOF** (base file + incremental files).
-
----
-
-### Q19. RDB vs AOF — which to use in production?
-
-**Both, usually.**
-- RDB for quick restart and offsite backups.
-- AOF (`everysec`) for crash durability.
-
-Redis can replay both on startup; AOF takes precedence for recovery.
-
-For pure caches where data loss is fine, disable both for max performance.
-
----
-
-### Q20. Can persistence cause latency spikes?
-
-Yes:
-- **fork** for RDB or AOF rewrite stalls the process briefly. With huge memory, this can be noticeable.
-- AOF `fsync` on slow disk causes write stalls.
-- Disable Transparent Huge Pages on Linux — they amplify fork copy-on-write cost.
-
-Mitigations: replicate to a secondary that handles persistence (the primary can run RDB-less); use fast SSD; tune `aof-use-rdb-preamble`.
-
----
-
-## Pub/Sub and Streams
-
-### Q21. How does Pub/Sub work?
+**Answer:**
 
 ```
 # Subscriber
@@ -329,37 +345,37 @@ SUBSCRIBE news
 PUBLISH news "hello"
 ```
 
-Fire-and-forget broadcast. **No persistence, no replay, no acks.** If a subscriber is offline, it misses messages. Use only for ephemeral notifications (cache invalidation broadcasts, "new event" pings).
+Pub/Sub is fire-and-forget broadcast. There is no persistence, no replay, and no acknowledgment. If a subscriber is offline when a message is published, it misses the message. Use only for ephemeral notifications such as cache invalidation broadcasts.
 
----
+## Q22. How does Pub/Sub behave in Redis Cluster?
 
-### Q22. Pub/Sub in Redis Cluster?
+**Answer:**
 
-Standard `PUBLISH` replicates across the cluster (broadcast). For scale, **sharded pub/sub** (`SPUBLISH`/`SSUBSCRIBE`, Redis 7) keys messages to specific shards.
+Standard `PUBLISH` is broadcast across the entire cluster, which doesn't scale. Redis 7 added sharded pub/sub (`SPUBLISH` / `SSUBSCRIBE`), which routes messages by hash slot like normal keys. For durable messaging at scale, use Streams or a real broker.
 
-For real durable messaging at scale, use Streams or a real broker (Kafka, NATS).
+## Q23. When should you use Streams vs Pub/Sub vs Lists for queues?
 
----
+**Answer:**
 
-### Q23. When to use Streams vs Pub/Sub vs Lists for queues?
-
-| Need | Use |
-|------|-----|
+| Need | Choice |
+|------|--------|
 | Broadcast, no durability | Pub/Sub |
-| Simple FIFO/LIFO queue, single consumer | List + `BRPOP` |
-| Durable queue, multiple consumers, acks, replay | Streams + consumer groups |
-| Heavy throughput, ordering, multi-region | Real broker (Kafka, etc.) |
+| Simple FIFO queue, one consumer | List + `BRPOP` |
+| Durable queue, parallel consumers, acks, replay | Streams + consumer groups |
+| Multi-region, ordering, very high throughput | Real broker (Kafka, NATS) |
 
 ---
 
-## Transactions and Lua Scripting
+## 5. Transactions and Lua Scripting
 
-### Q24. Are Redis transactions ACID?
+## Q24. Are Redis transactions ACID?
 
-Sort of. `MULTI`/`EXEC` queues commands and runs them atomically (no other client interleaves). But:
-- **No rollback** — if a command fails mid-transaction, the rest still execute.
-- **No isolation level negotiation** — single-threaded execution gives serialized isolation.
-- **Persistence depends on AOF settings.**
+**Answer:**
+
+Partly. `MULTI` / `EXEC` queues commands and runs them atomically — no other client interleaves between them. But:
+
+- There is no rollback. If a command fails mid-transaction, later commands still run.
+- Persistence depends on AOF settings.
 
 ```
 MULTI
@@ -368,7 +384,7 @@ INCR b
 EXEC
 ```
 
-Add `WATCH` for optimistic concurrency:
+`WATCH` adds optimistic concurrency:
 
 ```
 WATCH counter
@@ -378,19 +394,17 @@ SET counter (val + 1)
 EXEC          # fails if counter changed since WATCH
 ```
 
----
+## Q25. Why use Lua scripts?
 
-### Q25. Why use Lua scripts?
+**Answer:**
 
-- Atomic multi-step logic (better than MULTI for conditional flows).
-- Fewer round trips (script runs server-side).
-- Reusable via `EVALSHA` with cached SHA.
+For atomic multi-step logic that is hard to express with `MULTI`. The script runs server-side in a single shot, so it eliminates round trips and races.
 
 ```lua
--- Atomic "decrement-if-positive"
-local v = tonumber(redis.call('GET', KEYS[1]))
+-- Atomic "decrement if positive"
+local v = tonumber(redis.call("GET", KEYS[1]))
 if v and v > 0 then
-  redis.call('DECR', KEYS[1])
+  redis.call("DECR", KEYS[1])
   return 1
 end
 return 0
@@ -400,174 +414,162 @@ return 0
 EVAL "<script>" 1 mykey
 ```
 
-**Caution:** scripts run inline, blocking everything. Keep them short. Long scripts trigger `lua-time-limit`.
+Keep scripts short — they block all other commands while running.
 
----
+## Q26. What are Functions and how are they different from scripts?
 
-### Q26. Functions vs scripts (Redis 7)?
+**Answer:**
 
-Redis Functions are server-side libraries (loaded once with `FUNCTION LOAD`), more maintainable than ad-hoc scripts. Replicate to replicas, persist in RDB/AOF, can be versioned.
+Functions (Redis 7) are server-side libraries, loaded once with `FUNCTION LOAD`, replicated to replicas, and persisted across restarts. They are easier to manage than ad-hoc EVAL scripts.
 
 ```
-FUNCTION LOAD "#!lua name=mylib\n redis.register_function('myfn', function(keys, args) ... end)"
+FUNCTION LOAD "#!lua name=mylib
+redis.register_function('myfn', function(keys, args) ... end)"
+
 FCALL myfn 1 mykey arg1
 ```
 
-For new code, prefer Functions over `EVAL`.
+Prefer Functions over `EVAL` for new code.
 
 ---
 
-## Replication, Sentinel, and Cluster
+## 6. Replication, Sentinel, and Cluster
 
-### Q27. How does Redis replication work?
+## Q27. How does Redis replication work?
 
-Asynchronous primary → replica replication. Replica connects, runs initial sync (RDB snapshot from primary, then continues streaming write commands).
+**Answer:**
+
+Asynchronous primary-to-replica replication. The replica connects, receives an initial RDB snapshot, then continues streaming write commands.
 
 ```
-# On replica
+# On the replica
 REPLICAOF primary-host 6379
+
+# Promote a replica back to primary
+REPLICAOF NO ONE
 ```
 
-**Properties:**
-- Async — replicas can lag.
-- Replicas can serve reads (`READONLY` in cluster).
-- Failure of replica doesn't impact primary.
+Replicas can serve reads. Failure of a replica does not impact the primary.
 
----
+## Q28. What is Redis Sentinel?
 
-### Q28. What is Redis Sentinel?
+**Answer:**
 
-HA solution for non-clustered Redis. Sentinels monitor the primary and replicas, perform automatic failover, and act as a service-discovery endpoint for clients.
+A high-availability solution for non-clustered Redis. Sentinels monitor the primary and replicas, perform automatic failover, and act as a service-discovery endpoint for clients. Use at least three Sentinels so they have a quorum. Sentinel handles single-shard HA; for horizontal scale, use Redis Cluster.
 
-- Need at least 3 Sentinels (quorum).
-- On primary failure, Sentinels elect a replica as the new primary.
-- Clients query Sentinel for the current primary address.
+## Q29. What is Redis Cluster?
 
-Sentinel is for **single-shard HA**. For horizontal scale, use Cluster.
-
----
-
-### Q29. What is Redis Cluster?
+**Answer:**
 
 Built-in horizontal sharding with automatic failover.
 
-- 16384 hash slots distributed across master nodes.
-- Key → CRC16 → slot → node.
-- Each master has 1+ replicas.
-- On master failure, replica is promoted (no Sentinel needed).
-- Recommended minimum: **6 nodes** (3 masters + 3 replicas).
+- 16384 hash slots are distributed across master nodes.
+- Each key hashes to a slot via CRC16.
+- Each master has at least one replica.
+- On master failure, a replica is promoted automatically (no Sentinel needed).
+- Recommended minimum: six nodes (three masters and three replicas).
 
 ```
-# Key with hash tag — forces same slot
+# Hash tag forces multiple keys into the same slot
 SET user:{42}:profile "..."
 SET user:{42}:settings "..."
-# Both keys hash on "42" → same slot → can be in same multi-key op
+# Both keys hash on "42" → same slot → can be in one MULTI / Lua script
 ```
 
----
+## Q30. What are the limitations of Redis Cluster?
 
-### Q30. Limitations of Redis Cluster?
+**Answer:**
 
-- Multi-key operations only work if all keys map to the same slot (use **hash tags** `{...}`).
+- Multi-key operations only work when all keys map to the same slot. Use hash tags `{...}` to group related keys.
 - No cross-slot transactions.
-- `KEYS`, `SCAN` work per-node — clients must aggregate.
-- Pub/Sub is broadcast across cluster (use sharded pub/sub).
-- Driver must be cluster-aware.
+- `KEYS` and `SCAN` work per node — clients aggregate results.
+- Pub/Sub is broadcast across the cluster (use sharded pub/sub instead).
+- Drivers must be cluster-aware.
+
+## Q31. How do clients talk to a cluster?
+
+**Answer:**
+
+A client connects to any node and sends a command. If the node is wrong, the server replies `MOVED <slot> <host:port>`; the client redirects and caches the slot map. During resharding, the server may reply `ASK` for in-flight slot moves. Smart drivers cache the slot map and refresh on `MOVED`.
+
+## Q32. Can you lose acknowledged writes with async replication?
+
+**Answer:**
+
+Yes. By default, replication is asynchronous. If the primary acknowledges a write and crashes before replicating it, the write is lost. Mitigations include `WAIT N timeout` (wait for N replicas), AOF with `appendfsync always` (slow but durable), and application-level idempotency. For strong durability, Redis is not the right tool — use a database.
 
 ---
 
-### Q31. How do clients talk to a cluster?
+## 7. Memory and Eviction
 
-- Client connects to any node, sends a command.
-- If wrong node, server replies `MOVED <slot> <host:port>`.
-- Client redirects (and caches the slot map).
-- During resharding, server may reply `ASK` for in-flight slot moves.
+## Q33. What happens when Redis runs out of memory?
 
-Smart drivers cache the slot map and refresh on `MOVED`.
+**Answer:**
 
----
-
-### Q32. Async replication risk — can you lose acked writes?
-
-Yes. Default replication is async. If the primary acks a write and crashes before replicating, the write is lost.
-
-Mitigations:
-- `WAIT N timeout` — block until N replicas ack (still not synchronous).
-- Use AOF with `appendfsync always` (slow but durable).
-- Application-level idempotency.
-- For strongly durable storage, Redis isn't the right tool — use a database.
-
----
-
-## Memory and Eviction
-
-### Q33. What happens when Redis runs out of memory?
-
-Depends on `maxmemory-policy`:
+Behavior depends on `maxmemory-policy`:
 
 | Policy | Behavior |
 |--------|----------|
-| `noeviction` (default) | Writes fail with OOM error |
-| `allkeys-lru` | Evict least-recently-used across all keys |
+| `noeviction` (default) | Writes fail with an OOM error |
+| `allkeys-lru` | Evict the least-recently-used key from any key |
 | `volatile-lru` | LRU only among keys with TTL |
-| `allkeys-lfu` | Least-frequently-used (Redis 4+) |
+| `allkeys-lfu` | Evict the least-frequently-used key (recommended for caches) |
 | `volatile-lfu` | LFU among keys with TTL |
 | `allkeys-random` | Random eviction |
 | `volatile-random` | Random among keys with TTL |
-| `volatile-ttl` | Evict shortest-TTL first |
-
-For caches: `allkeys-lfu` is typically best (frequency-aware).
-
----
-
-### Q34. LRU vs LFU?
-
-- **LRU** evicts what hasn't been used recently — vulnerable to scan workloads (a one-time scan flushes hot keys).
-- **LFU** counts approximate access frequency — resistant to scans, better hit rate for typical caches.
-
-Redis LFU uses a logarithmic counter (Morris counter) — efficient, with decay.
-
----
-
-### Q35. How does Redis estimate LRU/LFU efficiently?
-
-Sampling. Redis picks N random keys (configurable, default 5) and evicts the worst. Bigger sample → closer to true LRU/LFU, more CPU.
+| `volatile-ttl` | Evict the key with the shortest TTL |
 
 ```
-maxmemory-samples 10
+CONFIG SET maxmemory 8gb
+CONFIG SET maxmemory-policy allkeys-lfu
 ```
 
----
+## Q34. LRU vs LFU?
 
-### Q36. Memory optimization tips?
+**Answer:**
 
-- Use the right data structure (small hashes, sets, sorted sets are stored as listpacks — very compact).
-- Keep keys short (`u:42:p` vs `users:42:profile`) — saves bytes at scale.
-- Use `OBJECT ENCODING <key>` to verify compact encoding (`listpack`, `intset`, `embstr`).
-- Keys are stored in the global keyspace dictionary; many short keys still cost overhead.
-- Use `MEMORY USAGE <key>` to inspect.
-- Run `MEMORY DOCTOR` for diagnostics.
-- Avoid huge values — compress (zstd/snappy) at the app or use RedisJSON for structured data.
+- LRU evicts what hasn't been used recently — vulnerable to scan workloads where a one-time pass over many keys flushes hot keys.
+- LFU counts approximate access frequency — resistant to scans and usually gives a better hit rate for typical caches.
 
----
+Redis LFU uses a logarithmic counter (Morris counter) with decay.
 
-### Q37. What is `maxmemory` and how do you size it?
+## Q35. How does Redis estimate LRU/LFU efficiently?
 
-Hard cap on memory Redis will use. Reserve ~25-30% headroom for:
-- Replication backlog buffer.
-- Fork copy-on-write during RDB/AOF rewrite.
-- Client output buffers.
-- Lua script memory.
+**Answer:**
 
-If you set `maxmemory` to total RAM, fork can OOM-kill Redis.
-
----
-
-## Production Use Cases
-
-### Q38. Caching pattern — cache-aside (lazy loading)?
+By sampling. Redis picks N random keys (default 5) and evicts the worst one. A larger sample is closer to true LRU/LFU but uses more CPU.
 
 ```
+CONFIG SET maxmemory-samples 10
+```
+
+## Q36. What are some memory optimization tips?
+
+**Answer:**
+
+- Choose the right data structure — small hashes, sets, and sorted sets use compact encodings (listpack, intset).
+- Keep keys short (`u:42:p` rather than `users:42:profile`) — saves bytes at scale.
+- Inspect encoding with `OBJECT ENCODING <key>`.
+- Use `MEMORY USAGE <key>` and `MEMORY DOCTOR` for diagnostics.
+- Compress large values at the application layer.
+
+## Q37. How do you size `maxmemory`?
+
+**Answer:**
+
+`maxmemory` is the hard cap on memory Redis uses. Reserve about 25-30% headroom for the replication backlog buffer, fork copy-on-write during RDB/AOF rewrite, client output buffers, and Lua memory. If you set `maxmemory` to total system RAM, the fork can OOM-kill Redis.
+
+---
+
+## 8. Production Use Cases
+
+## Q38. How does cache-aside (lazy loading) work?
+
+**Answer:**
+
+The application checks the cache, falls back to the database on a miss, and populates the cache for next time.
+
+```python
 val = redis.get(key)
 if val is None:
     val = db.query(...)
@@ -575,32 +577,40 @@ if val is None:
 return val
 ```
 
-**Pros:** simple, only what's accessed is cached.
-**Cons:** cache miss penalty; stale data unless invalidated; thundering herd on popular keys.
+Pros: simple, only what's accessed gets cached.
+Cons: cache miss penalty, possible thundering herd on hot keys, manual invalidation.
 
----
+## Q39. What about write-through and write-behind caching?
 
-### Q39. Write-through and write-behind caching?
+**Answer:**
 
-- **Write-through:** every write goes to cache and DB synchronously. Cache always fresh; writes slower.
-- **Write-behind (write-back):** writes to cache immediately, flush to DB asynchronously. Fast writes; data loss risk on crash.
+- Write-through — every write goes to cache and database synchronously. Cache always fresh; writes are slower.
+- Write-behind (write-back) — writes hit the cache immediately and flush to the database asynchronously. Fast writes; data loss risk on crash.
 
-Lazy cache-aside is the most common for read-heavy systems.
+For most read-heavy systems, lazy cache-aside is the simplest and most common.
 
----
+## Q40. How do you avoid cache stampede?
 
-### Q40. How do you avoid cache stampede?
+**Answer:**
 
-When a hot key expires and many clients race to recompute:
+When a hot key expires, many clients race to recompute it. Strategies:
 
-- **Mutex / lock:** first request rebuilds, others wait.
-- **Probabilistic early expiration:** refresh proactively before expiry (XFetch algorithm).
-- **Stale-while-revalidate:** return stale value while async refresh happens.
-- **Request coalescing** at the app layer.
+- Mutex / lock — first request rebuilds, others wait.
+- Probabilistic early expiration (XFetch) — refresh proactively before expiry.
+- Stale-while-revalidate — serve stale value while a single async refresh runs.
+- Request coalescing in the application.
 
----
+```python
+# Simple lock to serialize rebuilds
+if redis.set(f"lock:{key}", "1", nx=True, ex=10):
+    val = db.query(...)
+    redis.set(key, val, ex=300)
+    redis.delete(f"lock:{key}")
+```
 
-### Q41. Session storage in Redis?
+## Q41. How do you store sessions in Redis?
+
+**Answer:**
 
 ```
 SET session:abc123 "user_id=42|role=admin" EX 1800
@@ -608,51 +618,57 @@ EXPIRE session:abc123 1800            # extend on activity
 DEL session:abc123                    # logout
 ```
 
-Or hash for per-field updates:
+Or use a hash for per-field updates:
 
 ```
 HSET session:abc123 user_id 42 role admin
-HEXPIRE session:abc123 1800 FIELDS 1 user_id   # 7.4+ per-field TTL
+EXPIRE session:abc123 1800
 ```
 
 Use replication for HA — losing sessions logs everyone out.
 
----
+## Q42. How do you implement fixed-window rate limiting?
 
-### Q42. Rate limiting — fixed window?
+**Answer:**
+
+Increment a counter keyed by user and current minute, expire after the window.
 
 ```
 key = "rl:user:42:" + currentMinute
-n = INCR key
+INCR key
 EXPIRE key 60 NX
-if n > 100: reject
+# reject if value > 100
 ```
 
-Simple, but boundary effect: 100 requests at 12:59:59 + 100 at 13:00:00 = 200 in 2 seconds.
+Simple but has a boundary effect — 100 requests at 12:59:59 plus 100 at 13:00:00 means 200 requests in two seconds.
 
----
+## Q43. How do you implement sliding-window log rate limiting?
 
-### Q43. Rate limiting — sliding window log?
+**Answer:**
+
+Use a sorted set keyed by user, with timestamps as scores. Drop old entries, count current, add new — wrap in Lua for atomicity.
 
 ```
 now = currentTimeMillis
-ZREMRANGEBYSCORE rl:user:42 0 (now - 60000)     # drop old
-ZCARD rl:user:42                                # current count
+ZREMRANGEBYSCORE rl:user:42 0 (now - 60000)
+ZCARD rl:user:42
 ZADD rl:user:42 now <unique-id>
 EXPIRE rl:user:42 60
 ```
 
-Wrap in Lua for atomicity. Accurate but more memory-intensive.
+More accurate but uses more memory than fixed window.
 
----
+## Q44. How does token bucket rate limiting work?
 
-### Q44. Rate limiting — token bucket?
+**Answer:**
 
-State (`tokens`, `lastRefill`) in a hash, updated atomically via Lua. Smooth bursts. Common production choice.
+Store the current token count and last refill time in a hash. On each request, refill based on elapsed time, decrement if a token is available, otherwise reject. Implement the read-modify-write atomically with Lua. Token bucket smooths out bursts and is a common production choice.
 
----
+## Q45. How do you build a leaderboard?
 
-### Q45. Leaderboards?
+**Answer:**
+
+A sorted set is exactly the right tool.
 
 ```
 ZADD leaderboard 1500 user:42
@@ -661,18 +677,18 @@ ZINCRBY leaderboard 10 user:42
 # Top 10
 ZREVRANGE leaderboard 0 9 WITHSCORES
 
-# User's rank
+# Rank of a specific user
 ZREVRANK leaderboard user:42
 
-# Friend leaderboard (set algebra)
+# Friend leaderboard via set algebra
 ZINTERSTORE friends:lb 2 leaderboard friends:user:42
 ```
 
-Sub-millisecond at any scale. Default rank is 0-based.
+Sub-millisecond at any scale.
 
----
+## Q46. How do you store counters and metrics?
 
-### Q46. Counter / metrics?
+**Answer:**
 
 ```
 INCR pageviews:2025-05-05
@@ -680,44 +696,45 @@ INCRBY revenue:cents:2025-05-05 199
 HINCRBY counters:by-product:42 sales 1
 ```
 
-Atomic. Combine with periodic flush to a time-series DB (InfluxDB, TimescaleDB, Prometheus pushgateway).
+All atomic. For long-term storage, periodically flush to a time-series database (TimescaleDB, InfluxDB, Prometheus).
 
----
+## Q47. How do you build a job queue?
 
-### Q47. Job queues?
+**Answer:**
 
-Simple list-based:
+A simple list-based queue:
 
 ```
 LPUSH jobs '{"type":"send_email","id":1}'
-BRPOP jobs 30                          # worker blocks for up to 30s
+BRPOP jobs 30                          # worker blocks up to 30s
 ```
 
-For reliability (don't lose jobs on worker crash):
+To not lose jobs on worker crash, atomically move to a "processing" list:
 
 ```
-# atomic move from queue to processing list
 BLMOVE jobs:pending jobs:processing LEFT RIGHT 30
-# on success
-LREM jobs:processing 1 <job>
+# do the work...
+LREM jobs:processing 1 <job-payload>
 ```
 
-For full features (acks, retries, parallel consumers, replay): **Redis Streams** with consumer groups, or libraries like BullMQ (Node) / Sidekiq (Ruby) / RQ (Python).
+For full features (acks, retries, parallel consumers, replay), use Redis Streams with consumer groups, or an established library like BullMQ, Sidekiq, or RQ.
 
 ---
 
-## Distributed Locks
+## 9. Distributed Locks
 
-### Q48. How do you build a simple lock?
+## Q48. How do you build a simple lock?
+
+**Answer:**
+
+`SET key value NX EX seconds` acquires the lock atomically with a TTL. Release safely by checking the value first (with Lua):
 
 ```
 SET lock:resource <unique-token> NX EX 30
 ```
 
-Acquire if not set, with TTL to avoid orphaned locks. Release safely (don't delete someone else's lock):
-
 ```lua
--- Lua: delete only if value matches
+-- Release only if the token matches
 if redis.call("GET", KEYS[1]) == ARGV[1] then
   return redis.call("DEL", KEYS[1])
 else
@@ -725,242 +742,156 @@ else
 end
 ```
 
----
+The TTL prevents an orphaned lock if the holder crashes.
 
-### Q49. What's the issue with Redis locks?
+## Q49. What is the issue with Redis locks?
 
-Single-instance Redis: lock is fine until the node fails. After failover, an unsynced replica might not have the lock — two clients could both believe they hold it.
+**Answer:**
 
-**Redlock** (the multi-instance algorithm) attempts to mitigate: acquire the lock on a majority of N independent Redis nodes, only succeed if you own >N/2.
+A single Redis lock is only as reliable as a single Redis instance. After failover, a freshly promoted replica may not yet have the lock — two clients can believe they hold it.
 
-**Redlock controversy:** Martin Kleppmann argued Redlock isn't safe under clock drift / GC pause assumptions; Antirez (Redis author) responded. **Practical guidance:** for non-critical locks, single-instance Redis with TTL is fine. For correctness-critical locks (financial), use a system designed for consensus (etcd, ZooKeeper, Postgres advisory locks).
+The Redlock algorithm tries to mitigate this by acquiring the lock on a majority of N independent Redis nodes. Critics (Martin Kleppmann) have argued Redlock isn't safe under clock drift and GC pauses; Redis's author has responded.
 
----
+Practical guidance: for non-critical mutual exclusion, single-instance Redis with TTL is fine. For correctness-critical work (financial), use a system designed for consensus — etcd, ZooKeeper, or PostgreSQL advisory locks.
 
-### Q50. What is fencing? Why do locks need it?
+## Q50. What is fencing and why do locks need it?
 
-A monotonic token granted with each lock acquisition. Downstream services check the token before acting; reject older tokens.
+**Answer:**
+
+A fencing token is a monotonically increasing number granted with each lock acquisition. Downstream services check the token before acting and reject older tokens. This protects against stale lock holders that wake up after their TTL has expired.
 
 ```
 client A: acquires lock, gets fencing token 5
-client A: stalls (GC pause)
-client A's lease expires → client B acquires lock, gets token 6
+client A: stalls (long GC pause)
+TTL expires, client B acquires lock, gets token 6
 client B: writes with token 6
-client A: wakes up, attempts write with token 5 → REJECTED
+client A: wakes up, attempts write with token 5  -> REJECTED
 ```
 
-Without fencing, stale lock holders can corrupt data despite TTL. Redis doesn't natively provide fencing tokens (you can build one with `INCR`).
+Redis doesn't natively provide fencing tokens, but you can build one with `INCR`.
 
 ---
 
-## Redis vs Memcached
+## 10. Redis vs Memcached
 
-### Q51. Comparison
+## Q51. How does Redis compare to Memcached?
+
+**Answer:**
 
 | Concern | Redis | Memcached |
 |---------|-------|-----------|
 | Data types | Many | Strings only |
 | Persistence | RDB + AOF | None |
-| Replication | Yes | No (or via app) |
+| Replication | Yes | No (or app-managed) |
 | Clustering | Native | App-level / proxy |
 | Threading | Single-thread + I/O threads | Multi-threaded |
-| Eviction | LRU/LFU/etc. | LRU |
+| Eviction | LRU / LFU / etc. | LRU |
 | Pub/Sub, scripting, streams | Yes | No |
 | Memory efficiency | Good | Slightly better for raw KV |
-| Use case | Cache + data structures + queues + lock | Pure cache |
 
-For pure cache at extreme RPS where you don't need anything else, Memcached is leaner. For everything else, Redis.
+For a pure cache at extreme RPS where you don't need anything else, Memcached is leaner. For everything else, Redis.
 
 ---
 
-## Common Gotchas
+## 11. Common Gotchas
 
-### Q52. `KEYS *` — why never in production?
+## Q52. Why never run `KEYS *` in production?
 
-`KEYS` blocks the server while it scans the entire keyspace. On a million-key DB, this stalls everything for seconds.
+**Answer:**
 
-**Always use `SCAN`** (cursor-based, incremental).
+`KEYS` blocks the server while it scans the entire keyspace. On a million-key database, this stalls everything for seconds. Always use `SCAN`, which is cursor-based and incremental.
 
 ```
 SCAN 0 MATCH "user:*" COUNT 100
+# server returns a new cursor; iterate until cursor is 0
 ```
 
----
+## Q53. What are big keys and hot keys?
 
-### Q53. Big keys / hot keys?
+**Answer:**
 
-**Big keys** (e.g., a list with 1M elements) cause:
-- Slow operations (`LRANGE`, `DEL` on big keys blocks).
-- Replication / migration stalls during cluster resharding.
-- Memory imbalance across cluster shards.
+- A big key is a single key holding a very large value (a list with a million elements). Operations such as `LRANGE` or `DEL` on big keys block the server. Big keys also cause replication and migration stalls.
+- A hot key is one key receiving the bulk of traffic — it saturates a single shard and defeats sharding.
 
-**Hot keys** (one key getting 90% of traffic) saturate a single shard, defeat sharding.
+Find them with:
 
-Find them: `redis-cli --bigkeys`, `redis-cli --hotkeys` (4.0+), `MEMORY USAGE`.
+```
+redis-cli --bigkeys
+redis-cli --hotkeys      # 4.0+
+MEMORY USAGE <key>
+```
 
-Mitigate: split big keys (sharded hash), cache hot keys in app memory or replicate to multiple cluster nodes.
+Mitigate by splitting big keys (use a sharded hash) and replicating hot keys to multiple shards or to in-process caches.
 
----
+## Q54. What does `latency-monitor-threshold` do?
 
-### Q54. What does `latency-monitor-threshold` do?
+**Answer:**
+
+Tracks operations slower than a threshold, with reasons (fork stall, AOF fsync, expired-keys cycle).
 
 ```
 CONFIG SET latency-monitor-threshold 100   # ms
 LATENCY LATEST
 LATENCY HISTORY event
+LATENCY DOCTOR
 ```
 
-Tracks operations slower than the threshold, with reasons (fork, AOF fsync, expired keys cycle, etc.). Essential for diagnosing latency spikes.
+Essential for diagnosing latency spikes.
 
----
+## Q55. Is key expiry precise?
 
-### Q55. Expiry — is it precise?
+**Answer:**
 
 No. Redis uses two strategies:
-- **Lazy expiration:** key checked on access; if expired, removed and treated as missing.
-- **Active expiration:** background job samples 20 random keys; deletes any expired; repeats if >25% were expired.
 
-Result: an expired key may persist briefly. For exact timing, don't rely on Redis expiry — track expiration in app logic if needed.
+- Lazy expiration — a key is checked when accessed; if expired, it is deleted and treated as missing.
+- Active expiration — a background job samples 20 random keys, deletes any expired, and repeats if more than 25% were expired.
 
----
+An expired key may persist briefly. For exact timing, track expiration in application logic.
 
-### Q56. Connection pool sizing?
+## Q56. How do you size the connection pool?
 
-Each connection costs memory and a file descriptor. Avoid per-request connections (TLS handshake is expensive).
+**Answer:**
 
-Typical: pool size = number of concurrent app workers × small multiplier (2-4). Monitor `connected_clients` and `tracking_clients`. Cap at `maxclients`.
+Each connection costs memory and a file descriptor. Avoid opening a connection per request — TLS handshakes are expensive. A typical pool size is the number of concurrent application workers times a small multiplier (2-4). Monitor `connected_clients` against `maxclients`.
 
----
+## Q57. What is the impact of `EXPIRE` on memory?
 
-### Q57. What's the impact of `EXPIRE` on memory?
+**Answer:**
 
-A key with TTL has slightly more overhead (extra dict entry for expiry). At scale, millions of TTL keys still fit comfortably — TTL doesn't bloat much.
+A key with a TTL has slightly more overhead because of an extra entry in the expiry dictionary. At normal scales, this is negligible. Massive TTL churn (constantly expiring and replacing keys) does pressure the active-expire cycle. If you see latency, tune `hz` (default 10).
 
-But **massive TTL churn** (constantly expiring/replacing keys) puts pressure on the active-expire cycle. If you see latency, tune `hz` (default 10 hz expire scan).
+## Q58. What O(N) commands should you avoid?
 
----
-
-### Q58. `O(N)` commands to avoid?
+**Answer:**
 
 | Command | Cost | Alternative |
 |---------|------|-------------|
 | `KEYS *` | O(N) | `SCAN` |
-| `HGETALL` huge hash | O(N) | `HSCAN`, smaller hashes |
-| `LRANGE 0 -1` huge list | O(N) | Paginate with offsets |
-| `SMEMBERS` huge set | O(N) | `SSCAN` |
-| `DEL` huge collection | O(N) | `UNLINK` (async free, 4.0+) |
-| `FLUSHDB`/`FLUSHALL` | O(N) sync | `FLUSHDB ASYNC` |
+| `HGETALL` on huge hash | O(N) | `HSCAN` or smaller hashes |
+| `LRANGE 0 -1` on huge list | O(N) | Paginate |
+| `SMEMBERS` on huge set | O(N) | `SSCAN` |
+| `DEL` on huge collection | O(N) | `UNLINK` (async free) |
+| `FLUSHDB` / `FLUSHALL` | O(N) sync | `FLUSHDB ASYNC` |
 
-`UNLINK` is the safe `DEL`.
+`UNLINK` is the safe `DEL` — it frees memory in the background.
 
----
+## Q59. What should you know about TLS?
 
-### Q59. TLS — what should I know?
+**Answer:**
 
-- Redis supports TLS natively since 6.0.
-- Adds CPU + handshake latency; pool wisely.
-- Cluster bus traffic should also be TLS (`tls-cluster yes`).
-- Managed services (AWS ElastiCache, Azure Cache, GCP Memorystore, Upstash, Redis Cloud) handle this.
+Redis has supported TLS natively since 6.0. TLS adds CPU and handshake latency, so pool connections wisely. In a cluster, encrypt the cluster bus too with `tls-cluster yes`. Managed services (AWS ElastiCache, Azure Cache, GCP Memorystore, Upstash, Redis Cloud) handle all of this for you.
 
----
+## Q60. How do you find slow Redis commands?
 
-## Real Interview Scenarios
+**Answer:**
 
-### Scenario 1: "Cache hit ratio dropped from 95% to 60%."
+The slowlog tracks commands that exceed a threshold.
 
-**Diagnosis:**
-1. `INFO stats` → check `keyspace_hits` vs `keyspace_misses`.
-2. `INFO memory` → memory near `maxmemory`?
-3. Eviction policy: are evictions happening (`evicted_keys`)?
-4. Did key cardinality explode? New traffic source spamming unique keys?
-5. TTL changed, keys expiring faster?
+```
+CONFIG SET slowlog-log-slower-than 10000   # microseconds (10 ms)
+SLOWLOG GET 100
+SLOWLOG RESET
+```
 
-**Fixes:**
-- Increase `maxmemory` or scale out cluster.
-- Switch to `allkeys-lfu` if scans are evicting hot keys.
-- Cache the right granularity (don't cache things that are unique per request).
-
----
-
-### Scenario 2: "Random p99 latency spikes every few minutes."
-
-**Likely causes:**
-- AOF rewrite or RDB snapshot — fork stall on big memory.
-- Slow query (`SLOWLOG GET`).
-- Big key operations.
-- Network issues.
-- Disk fsync stalls.
-
-**Diagnose:**
-- `SLOWLOG GET 100`
-- `LATENCY LATEST`, `LATENCY DOCTOR`
-- `INFO persistence` for last fork time
-
-**Mitigation:** offload persistence to a replica, disable THP, faster disk.
-
----
-
-### Scenario 3: "A worker pulls jobs but sometimes loses them on crash."
-
-**Cause:** `RPOP/LPOP` removes the job before processing. Crash mid-process → job gone.
-
-**Fix:** atomic move to a "processing" list with `BLMOVE` / `LMOVE`. Workers also recover stale jobs from "processing" by inspecting timestamps. Or use **Streams + consumer groups** which give acks (`XACK`) and reclaim (`XCLAIM`) natively.
-
----
-
-### Scenario 4: "We need a global rate limit — 1000 req/s across 50 app servers."
-
-**Approach:** centralize counter in Redis. Sliding window log or token bucket via Lua script for atomicity. Make sure the Lua script:
-- Reads current state.
-- Computes whether the request is allowed.
-- Updates state.
-- Returns allow/deny.
-
-Pin the rate-limit key to a single cluster slot per dimension. Avoid scatter-gather.
-
----
-
-### Scenario 5: "Our cluster has unbalanced shards."
-
-**Cause:** hot keys, hash tag overuse (`{tenant1}` everywhere → all keys land on one slot), or a few huge keys.
-
-**Diagnose:**
-- `CLUSTER COUNTKEYSINSLOT <slot>` for each slot.
-- `redis-cli --bigkeys`, `redis-cli --hotkeys`.
-
-**Fix:** rebalance with `CLUSTER RESHARD`, redesign hash tags so they actually distribute, split big keys.
-
----
-
-### Scenario 6: "Cache invalidation across multiple regions."
-
-**Approach options:**
-- **Pub/Sub on a control channel:** when DB changes, publish; all regional Redis subscribers invalidate. Simple, lossy.
-- **Streams with consumer per region:** durable, replayable.
-- **Active-active Redis (CRDT-based, Redis Enterprise):** geo-distributed with conflict resolution.
-- **Versioned keys:** include a version/epoch in the key; bump version to invalidate.
-
----
-
-### Scenario 7: "Should we cache the entire user object or per-field?"
-
-**Tradeoffs:**
-- Single string (JSON): one round-trip, simple, but read-modify-write requires whole-object replacement.
-- Hash: per-field updates, smaller diffs, slightly more memory overhead at very small sizes.
-- Hash wins if you frequently update one field of a many-field object.
-- JSON via RedisJSON if you need path operations.
-
----
-
-## Senior Redis Mantra
-
-1. **Right data structure beats clever algorithms.** Sorted sets, bitmaps, HLL, and streams cover surprising amounts of ground.
-2. **Single-threaded — don't run O(N) commands on production.** SCAN, UNLINK, paginate.
-3. **AOF + RDB for durable workloads, neither for pure cache.**
-4. **Cluster needs hash tags for multi-key operations.** Plan key naming.
-5. **Replication is async — don't treat Redis as a system of record.**
-6. **`allkeys-lfu` is usually the best eviction policy for caches.**
-7. **Big keys and hot keys destroy clusters. Hunt them with `--bigkeys` / `--hotkeys`.**
-8. **Lua / Functions for atomic multi-step logic. Keep them short.**
-9. **Streams beat lists for any queue that matters.**
-10. **For correctness-critical locks, Redis is not enough — fencing or a consensus system.**
+Combined with `LATENCY DOCTOR` and `--bigkeys`, this is the standard toolkit for diagnosing performance issues.

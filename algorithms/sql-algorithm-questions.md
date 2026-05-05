@@ -22,7 +22,7 @@
 
 ## Ranking and Top-N Problems
 
-### Q1. Find the Nth highest salary — three different methods.
+## Q1. Find the Nth highest salary — three different methods.
 
 **Schema:** `employees(id, name, salary)`
 
@@ -69,7 +69,7 @@ Simple and fast on small data, but `OFFSET` ignores ties (returns one row even i
 
 ---
 
-### Q2. Find the 2nd highest salary (special case).
+## Q2. Find the 2nd highest salary (special case).
 
 ```sql
 -- Returns NULL if only one distinct salary exists
@@ -82,7 +82,7 @@ The classic LeetCode answer. The outer `MAX` returns `NULL` when no row qualifie
 
 ---
 
-### Q3. Find the Nth highest salary in each department.
+## Q3. Find the Nth highest salary in each department.
 
 **Schema:** `employees(id, name, salary, department_id)`
 
@@ -107,7 +107,7 @@ WHERE rnk = N;
 
 ---
 
-### Q4. Top 3 highest-paid employees per department.
+## Q4. Top 3 highest-paid employees per department.
 
 ```sql
 SELECT department_id, name, salary
@@ -124,7 +124,7 @@ Use `RANK()` if you want strict positional ranking (skipping after ties). Use `R
 
 ---
 
-### Q5. Department with the highest average salary.
+## Q5. Department with the highest average salary.
 
 ```sql
 SELECT department_id, AVG(salary) AS avg_salary
@@ -150,7 +150,7 @@ WHERE avg_salary = (SELECT MAX(avg_salary) FROM dept);
 
 ## Duplicate Detection and Removal
 
-### Q6. Find duplicate emails in a users table.
+## Q6. Find duplicate emails in a users table.
 
 ```sql
 SELECT email, COUNT(*) AS cnt
@@ -170,7 +170,7 @@ WHERE email IN (
 
 ---
 
-### Q7. Delete duplicate rows but keep one (lowest id).
+## Q7. Delete duplicate rows but keep one (lowest id).
 
 **Postgres / SQL Server (CTE + ROW_NUMBER):**
 ```sql
@@ -192,7 +192,7 @@ INNER JOIN users u2
 
 ---
 
-### Q8. Find rows that appear exactly N times.
+## Q8. Find rows that appear exactly N times.
 
 ```sql
 SELECT product_id
@@ -203,7 +203,7 @@ HAVING COUNT(*) = 3;
 
 ---
 
-### Q9. Find duplicates considering multiple columns.
+## Q9. Find duplicates considering multiple columns.
 
 ```sql
 SELECT first_name, last_name, dob, COUNT(*)
@@ -216,7 +216,7 @@ HAVING COUNT(*) > 1;
 
 ## Cumulative and Running Calculations
 
-### Q10. Running total of orders per day.
+## Q10. Running total of orders per day.
 
 **Schema:** `orders(id, user_id, order_date, amount)`
 
@@ -234,7 +234,7 @@ ORDER BY order_date;
 
 ---
 
-### Q11. Running total per user.
+## Q11. Running total per user.
 
 ```sql
 SELECT
@@ -253,7 +253,7 @@ The explicit `ROWS BETWEEN ...` frame avoids ambiguity. Without it, `ORDER BY` d
 
 ---
 
-### Q12. 7-day moving average.
+## Q12. 7-day moving average.
 
 ```sql
 SELECT
@@ -269,7 +269,7 @@ Note: this uses *row-based* window. If gaps in dates exist, use `RANGE BETWEEN I
 
 ---
 
-### Q13. Cumulative percentage of total.
+## Q13. Cumulative percentage of total.
 
 ```sql
 SELECT
@@ -287,7 +287,7 @@ Useful for Pareto / 80-20 analysis.
 
 ## Anti-Join Patterns
 
-### Q14. Find customers who never placed an order.
+## Q14. Find customers who never placed an order.
 
 **Schema:** `customers(id)`, `orders(id, customer_id)`
 
@@ -319,7 +319,7 @@ WHERE id NOT IN (SELECT customer_id FROM orders WHERE customer_id IS NOT NULL);
 
 ---
 
-### Q15. Find products never ordered (anti-join with date filter).
+## Q15. Find products never ordered (anti-join with date filter).
 
 ```sql
 SELECT p.*
@@ -333,7 +333,7 @@ WHERE NOT EXISTS (
 
 ---
 
-### Q16. Find users active in March but not in April.
+## Q16. Find users active in March but not in April.
 
 ```sql
 SELECT DISTINCT user_id
@@ -349,7 +349,7 @@ WHERE DATE_TRUNC('month', activity_date) = '2025-03-01'
 
 ## Gaps and Islands
 
-### Q17. Find users active for at least 3 consecutive days.
+## Q17. Find users active for at least 3 consecutive days.
 
 **Schema:** `activity(user_id, activity_date)`, one row per user per day.
 
@@ -372,7 +372,7 @@ HAVING COUNT(*) >= 3;
 
 ---
 
-### Q18. Find gaps in a sequence of IDs.
+## Q18. Find gaps in a sequence of IDs.
 
 ```sql
 SELECT id + 1 AS gap_start,
@@ -386,7 +386,7 @@ WHERE next_id - id > 1;
 
 ---
 
-### Q19. Find longest consecutive login streak per user.
+## Q19. Find longest consecutive login streak per user.
 
 ```sql
 WITH grp AS (
@@ -409,7 +409,7 @@ GROUP BY user_id;
 
 ## Pivoting and Unpivoting
 
-### Q20. Pivot rows into columns (sales by quarter).
+## Q20. Pivot rows into columns (sales by quarter).
 
 **Schema:** `sales(year, quarter, amount)`
 
@@ -441,7 +441,7 @@ PIVOT (SUM(amount) FOR quarter IN ([Q1], [Q2], [Q3], [Q4])) p;
 
 ---
 
-### Q21. Unpivot columns into rows.
+## Q21. Unpivot columns into rows.
 
 ```sql
 SELECT year, 'Q1' AS quarter, q1 AS amount FROM sales_wide
@@ -459,7 +459,7 @@ Postgres also supports `unnest()` with arrays, and SQL Server has `UNPIVOT`.
 
 ## Self-Joins and Hierarchies
 
-### Q22. Show employees with their manager's name.
+## Q22. Show employees with their manager's name.
 
 **Schema:** `employees(id, name, manager_id)`
 
@@ -473,7 +473,7 @@ LEFT JOIN ensures the CEO (no manager) still appears.
 
 ---
 
-### Q23. Find employees who earn more than their manager.
+## Q23. Find employees who earn more than their manager.
 
 ```sql
 SELECT e.name
@@ -484,7 +484,7 @@ WHERE e.salary > m.salary;
 
 ---
 
-### Q24. Find all subordinates of a manager (recursive CTE).
+## Q24. Find all subordinates of a manager (recursive CTE).
 
 ```sql
 WITH RECURSIVE subordinates AS (
@@ -505,7 +505,7 @@ The recursive part keeps adding employees whose manager is already in the result
 
 ---
 
-### Q25. Find depth of each employee in the org tree.
+## Q25. Find depth of each employee in the org tree.
 
 ```sql
 WITH RECURSIVE org AS (
@@ -524,7 +524,7 @@ SELECT * FROM org ORDER BY depth, id;
 
 ---
 
-### Q26. Find pairs of friends (avoid duplicates).
+## Q26. Find pairs of friends (avoid duplicates).
 
 **Schema:** `friendships(user_a, user_b)` — assume no self-pairs.
 
@@ -540,7 +540,7 @@ This canonicalises every pair so `(1, 2)` and `(2, 1)` collapse into one.
 
 ## Statistics: Median, Mode, Percentiles
 
-### Q27. Median salary — three methods.
+## Q27. Median salary — three methods.
 
 **Method 1 — PERCENTILE_CONT (Postgres, Oracle, SQL Server):**
 ```sql
@@ -574,7 +574,7 @@ SELECT AVG(salary) FROM (
 
 ---
 
-### Q28. Mode (most common value).
+## Q28. Mode (most common value).
 
 ```sql
 SELECT category, COUNT(*) AS cnt
@@ -595,7 +595,7 @@ WHERE cnt = (SELECT MAX(cnt) FROM counts);
 
 ---
 
-### Q29. Percentile breakdown (e.g., quartiles).
+## Q29. Percentile breakdown (e.g., quartiles).
 
 ```sql
 SELECT
@@ -609,7 +609,7 @@ FROM employees;
 
 ## Date Math and Trends
 
-### Q30. Month-over-month revenue growth.
+## Q30. Month-over-month revenue growth.
 
 ```sql
 WITH monthly AS (
@@ -633,7 +633,7 @@ ORDER BY month;
 
 ---
 
-### Q31. Year-over-year comparison for the same week.
+## Q31. Year-over-year comparison for the same week.
 
 ```sql
 SELECT
@@ -647,7 +647,7 @@ ORDER BY wk;
 
 ---
 
-### Q32. Find rows where current value > previous value (LAG).
+## Q32. Find rows where current value > previous value (LAG).
 
 ```sql
 SELECT id, value, prev_value
@@ -663,7 +663,7 @@ WHERE value > prev_value;
 
 ---
 
-### Q33. Days since the last order per user.
+## Q33. Days since the last order per user.
 
 ```sql
 SELECT
@@ -675,7 +675,7 @@ FROM orders;
 
 ---
 
-### Q34. Find first and last order date per customer.
+## Q34. Find first and last order date per customer.
 
 ```sql
 SELECT customer_id,
@@ -691,7 +691,7 @@ To get the full row, use `FIRST_VALUE` / `LAST_VALUE` window functions or a join
 
 ## Window Function Patterns
 
-### Q35. Difference between ROW_NUMBER, RANK, DENSE_RANK.
+## Q35. Difference between ROW_NUMBER, RANK, DENSE_RANK.
 
 | Function | Salary 100 | Salary 100 | Salary 90 | Salary 80 |
 |----------|-----------|-----------|-----------|-----------|
@@ -705,7 +705,7 @@ To get the full row, use `FIRST_VALUE` / `LAST_VALUE` window functions or a join
 
 ---
 
-### Q36. Max value in a window (rolling max).
+## Q36. Max value in a window (rolling max).
 
 ```sql
 SELECT
@@ -718,7 +718,7 @@ FROM sensor;
 
 ---
 
-### Q37. First and last value within partition.
+## Q37. First and last value within partition.
 
 ```sql
 SELECT
@@ -737,7 +737,7 @@ FROM orders;
 
 ---
 
-### Q38. NTILE — split rows into N buckets.
+## Q38. NTILE — split rows into N buckets.
 
 ```sql
 SELECT
@@ -753,7 +753,7 @@ Useful for cohorting customers into spending tiers.
 
 ## LeetCode-Style Hard Patterns
 
-### Q39. Trips and users — cancellation rate per day.
+## Q39. Trips and users — cancellation rate per day.
 
 **Schema:** `trips(id, client_id, driver_id, status, request_at)`, `users(users_id, banned)`
 
@@ -773,7 +773,7 @@ GROUP BY request_at;
 
 ---
 
-### Q40. Department highest-paid employees (with ties).
+## Q40. Department highest-paid employees (with ties).
 
 ```sql
 WITH ranked AS (
@@ -789,7 +789,7 @@ WHERE rnk = 1;
 
 ---
 
-### Q41. Human Traffic of Stadium — three or more consecutive days with attendance ≥ 100.
+## Q41. Human Traffic of Stadium — three or more consecutive days with attendance ≥ 100.
 
 **Schema:** `stadium(id, visit_date, people)`
 
@@ -810,7 +810,7 @@ ORDER BY visit_date;
 
 ---
 
-### Q42. Customers who bought all products.
+## Q42. Customers who bought all products.
 
 **Schema:** `customer(customer_id, product_key)`, `product(product_key)`
 
@@ -825,7 +825,7 @@ Classic relational division pattern.
 
 ---
 
-### Q43. Tree node type (root / inner / leaf).
+## Q43. Tree node type (root / inner / leaf).
 
 **Schema:** `tree(id, p_id)`
 
@@ -841,7 +841,7 @@ FROM tree;
 
 ---
 
-### Q44. Exchange seats (swap pairs).
+## Q44. Exchange seats (swap pairs).
 
 **Schema:** `seat(id, student)`
 
@@ -859,7 +859,7 @@ ORDER BY id;
 
 ---
 
-### Q45. Last person who can fit in the elevator (cumulative weight).
+## Q45. Last person who can fit in the elevator (cumulative weight).
 
 **Schema:** `queue(person_id, person_name, weight, turn)`, weight limit 1000.
 
@@ -878,7 +878,7 @@ LIMIT 1;
 
 ---
 
-### Q46. Active users for at least 5 consecutive days.
+## Q46. Active users for at least 5 consecutive days.
 
 ```sql
 WITH grp AS (
@@ -895,7 +895,7 @@ HAVING COUNT(*) >= 5;
 
 ---
 
-### Q47. Customer placed an order both yesterday and today.
+## Q47. Customer placed an order both yesterday and today.
 
 ```sql
 SELECT customer_id
@@ -907,7 +907,7 @@ HAVING COUNT(DISTINCT order_date) = 2;
 
 ---
 
-### Q48. Reverse a string in SQL (Postgres).
+## Q48. Reverse a string in SQL (Postgres).
 
 ```sql
 SELECT REVERSE('hello');  -- 'olleh'
@@ -917,7 +917,7 @@ In dialects without `REVERSE`, use a recursive CTE iterating characters.
 
 ---
 
-### Q49. Find the second-most-recent order per user.
+## Q49. Find the second-most-recent order per user.
 
 ```sql
 SELECT user_id, order_id, order_date
@@ -931,7 +931,7 @@ WHERE rn = 2;
 
 ---
 
-### Q50. Detect when a value changes (sessionisation).
+## Q50. Detect when a value changes (sessionisation).
 
 ```sql
 SELECT user_id, event_time, status,
@@ -948,6 +948,87 @@ Each new session starts when status differs from the previous row.
 
 ---
 
+## Q51. Find employees who joined in the last 30 days.
+
+```sql
+SELECT id, name, hire_date
+FROM employees
+WHERE hire_date >= CURRENT_DATE - INTERVAL '30 days';
+```
+
+Index `hire_date` for fast filtering. Avoid wrapping the column in a function (`WHERE DATE(hire_date) >= ...`) — that defeats the index.
+
+---
+
+## Q52. Conditional aggregation — count by status in one row.
+
+```sql
+SELECT
+  COUNT(*) FILTER (WHERE status = 'active')   AS active,
+  COUNT(*) FILTER (WHERE status = 'pending')  AS pending,
+  COUNT(*) FILTER (WHERE status = 'closed')   AS closed
+FROM tickets;
+```
+
+`FILTER` is Postgres syntax. In MySQL/SQL Server use `SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END)`.
+
+---
+
+## Q53. Find the Kth smallest distinct value.
+
+```sql
+SELECT DISTINCT value
+FROM numbers
+ORDER BY value ASC
+LIMIT 1 OFFSET K - 1;
+```
+
+Equivalent to Nth highest, but ascending. Use `DENSE_RANK` for tie-aware behaviour.
+
+---
+
+## Q54. Use UNION ALL vs UNION.
+
+```sql
+-- UNION removes duplicates (extra sort)
+SELECT id FROM table_a
+UNION
+SELECT id FROM table_b;
+
+-- UNION ALL is faster — keeps duplicates
+SELECT id FROM table_a
+UNION ALL
+SELECT id FROM table_b;
+```
+
+If you know there are no duplicates, always prefer `UNION ALL` — it avoids a sort/dedup step.
+
+---
+
+## Q55. EXISTS vs IN — when does it matter?
+
+```sql
+-- IN: simple, but problematic with NULLs
+SELECT * FROM users
+WHERE id IN (SELECT user_id FROM orders);
+
+-- EXISTS: typically faster with correlated subqueries
+SELECT * FROM users u
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+
+-- NOT IN can return zero rows if subquery contains NULL
+SELECT * FROM users
+WHERE id NOT IN (SELECT user_id FROM orders);
+
+-- Safer with NOT EXISTS
+SELECT * FROM users u
+WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+```
+
+`NOT IN` returns zero rows if any value in the subquery is NULL. `NOT EXISTS` handles NULLs correctly.
+
+---
+
 ## Performance Tips for SQL Puzzles
 
 1. **Prefer window functions over correlated subqueries** — O(n log n) versus O(n²).
@@ -957,21 +1038,3 @@ Each new session starts when status differs from the previous row.
 5. **`UNION ALL` over `UNION`** if duplicates aren't an issue — saves a sort.
 6. **Beware row multiplication** when joining one-to-many before aggregation; aggregate first or use window functions.
 7. **Use `EXPLAIN ANALYZE`** to verify the planner picks expected indexes.
-
----
-
-## Practice Checklist
-
-- [ ] Nth highest salary, three ways
-- [ ] Top-N per group with ties handled
-- [ ] Find and delete duplicates
-- [ ] Running total / moving average
-- [ ] Median via window function
-- [ ] Customers with no orders (anti-join)
-- [ ] Consecutive-day streaks (gaps and islands)
-- [ ] Pivot quarterly sales
-- [ ] Recursive CTE for org hierarchy
-- [ ] Month-over-month growth %
-- [ ] LAG/LEAD comparisons
-- [ ] PERCENTILE_CONT for quartiles
-- [ ] Sessionisation by status change

@@ -1,817 +1,837 @@
-# WebSockets and Real-Time Communication — Interview Questions
+# WebSockets and Real-Time Communication Interview Questions
 
-**Purpose:** Senior-level coverage of WebSockets and the broader real-time communication landscape: HTTP polling vs SSE vs WebSocket vs WebRTC, scaling, authentication, deployment, and production pitfalls.
-
----
-
-## Table of Contents
-
-1. [Real-Time Transport Mechanisms](#real-time-transport-mechanisms)
-2. [WebSocket Protocol — Internals](#websocket-protocol--internals)
-3. [Connection Lifecycle](#connection-lifecycle)
-4. [Reconnection and Reliability](#reconnection-and-reliability)
-5. [Socket.io vs Raw WebSockets](#socketio-vs-raw-websockets)
-6. [Authentication and Authorization](#authentication-and-authorization)
-7. [Scaling WebSockets](#scaling-websockets)
-8. [Deployment — Load Balancers and Proxies](#deployment--load-balancers-and-proxies)
-9. [Kubernetes Considerations](#kubernetes-considerations)
-10. [Common Patterns](#common-patterns)
-11. [Security](#security)
-12. [Monitoring and Operations](#monitoring-and-operations)
-13. [WebRTC and When to Use What](#webrtc-and-when-to-use-what)
-14. [Common Pitfalls](#common-pitfalls)
+A complete pedagogical guide to WebSockets and real-time communication. Each question explains the concept in plain language and pairs it with a working code example.
 
 ---
 
-## Real-Time Transport Mechanisms
+## How to Use This Guide
 
-### Q1. What are the options for real-time communication over HTTP/TCP?
+Code examples use Node.js with the `ws` library and `socket.io`, plus browser JavaScript on the client side. To run the server samples:
 
-| Mechanism | Direction | Connection model | Browser support |
-|-----------|-----------|------------------|-----------------|
-| Short polling | C→S only (server data fetched on each call) | New HTTP request every interval | Universal |
-| Long polling | S→C delayed | HTTP request held open until server has data | Universal |
-| Server-Sent Events (SSE) | S→C only | Long-lived HTTP, text/event-stream | Universal except old IE |
-| WebSocket | Bidirectional, full-duplex | Single TCP connection upgraded from HTTP | Universal |
-| HTTP/2 server push | S→C | Promised resources over HTTP/2 | Phased out |
-| WebRTC | Bidirectional, peer-to-peer | UDP (with STUN/TURN), direct between clients | Modern browsers |
-| gRPC streaming | Bidirectional | HTTP/2 streams | Browser via grpc-web (server-stream only) |
-
----
-
-### Q2. Compare short polling, long polling, SSE, and WebSocket.
-
-| Aspect | Short polling | Long polling | SSE | WebSocket |
-|--------|---------------|--------------|-----|-----------|
-| Latency | High (interval) | Lower (on-demand) | Low | Lowest |
-| Server load | High (always reconnecting) | Medium (held open) | Low | Lowest |
-| Direction | Half-duplex | Half-duplex | S→C only | Full-duplex |
-| Headers per message | Full HTTP each time | Full HTTP each call | Initial only | Initial only |
-| Proxy/firewall friendliness | Best | Good | Good | Sometimes blocked |
-| Browser reconnection | Manual | Manual | Built-in `EventSource` | Manual or library |
-| Binary data | Awkward (base64) | Awkward | Text only | Native binary frames |
-| Typical use | Status checks | Fallback, low-rate updates | Notifications, news feeds | Chat, games, collab editing |
-
----
-
-### Q3. When would you choose SSE over WebSocket?
-
-**Answer:** When the data flow is server-to-client only, the client is a browser, and you want simplicity. SSE:
-
-- Auto-reconnects with `Last-Event-ID` for replay.
-- Multiplexes naturally over HTTP/2.
-- Easier to debug (it's just HTTP text).
-- Works over standard CDNs/proxies more often than WebSockets.
-
-Examples: stock tickers, live scores, push notifications. If you also need C→S messages, you can pair SSE with regular HTTP POSTs.
-
----
-
-### Q4. When NOT to use WebSocket?
-
-- One-way data flow → SSE is simpler.
-- Request/response semantics → HTTP/gRPC is simpler.
-- Very infrequent updates → polling is fine and easier to operate.
-- Hostile network environments → polling works through more proxies.
-- True peer-to-peer media (audio/video) → WebRTC.
-
----
-
-## WebSocket Protocol — Internals
-
-### Q5. How does a WebSocket handshake work?
-
-A WebSocket starts as an HTTP/1.1 request that asks to be upgraded:
-
+```bash
+npm install ws socket.io express
 ```
-Client → Server:
+
+---
+
+## 1. Real-Time Transport Mechanisms
+
+## Q1. What are the options for real-time communication over HTTP/TCP?
+
+**Answer:**
+
+There are four main techniques:
+
+| Technique | How it works |
+| --- | --- |
+| Short polling | Client repeatedly asks "anything new?" |
+| Long polling | Server holds the request until data is ready |
+| Server-Sent Events (SSE) | One-way HTTP stream from server to client |
+| WebSocket | Full-duplex TCP connection upgraded from HTTP |
+
+WebSocket is the only one that supports two-way push without re-establishing connections.
+
+## Q2. Compare short polling, long polling, SSE, and WebSocket.
+
+**Answer:**
+
+| Feature | Short polling | Long polling | SSE | WebSocket |
+| --- | --- | --- | --- | --- |
+| Direction | Client pull | Client pull (held) | Server push | Both |
+| Reconnect logic | Implicit | Implicit | Browser auto | Manual |
+| Overhead | High | Medium | Low | Lowest |
+| Through proxies | Yes | Yes | Yes | Sometimes |
+| Browser support | All | All | All except old IE | All modern |
+| Best use | Rare updates | Cheap server push | One-way feeds | Chat, games, live data |
+
+## Q3. When would you choose SSE over WebSocket?
+
+**Answer:**
+
+When the server pushes and the client mostly listens — notifications, live scores, log tailing. SSE runs over plain HTTP so it works through every proxy, has built-in browser auto-reconnect, and is much simpler to implement.
+
+```js
+// SSE server (Express)
+app.get('/events', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+  setInterval(() => res.write(`data: ${Date.now()}\n\n`), 1000);
+});
+
+// Client
+const es = new EventSource('/events');
+es.onmessage = (e) => console.log(e.data);
+```
+
+## Q4. When NOT to use WebSocket?
+
+**Answer:**
+
+- Updates are rare; polling is simpler.
+- Most traffic is one-way; SSE is enough.
+- Behind hostile proxies that block long-lived TCP.
+- The client can't keep a persistent connection (e.g. SEO crawler, batch tool).
+
+WebSockets bring real complexity: scaling, sticky sessions, reconnection, auth on long-lived connections.
+
+---
+
+## 2. WebSocket Protocol — Internals
+
+## Q5. How does a WebSocket handshake work?
+
+**Answer:**
+
+A WebSocket starts as an HTTP request with `Upgrade: websocket`. The client sends a base64 random key; the server responds with a hash of that key plus a magic GUID. After the handshake, the same TCP socket carries WebSocket frames in both directions.
+
+```text
+Client request:
 GET /chat HTTP/1.1
 Host: example.com
 Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
 Sec-WebSocket-Version: 13
-Origin: https://example.com
 
-Server → Client:
+Server response:
 HTTP/1.1 101 Switching Protocols
 Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
 ```
 
-After the 101 status code, the same TCP connection is reused for binary WebSocket frames. The `Sec-WebSocket-Accept` is a SHA-1 hash of the client's key + a fixed GUID — proves the server understood the upgrade.
+After 101, the connection is a WebSocket.
 
----
-
-### Q6. What does a WebSocket frame look like?
-
-```
-0                   1                   2                   3
-0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-+-+-+-+-+-------+-+-------------+-------------------------------+
-|F|R|R|R| opcode|M| Payload len |    Extended payload length    |
-|I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
-|N|V|V|V|       |S|             |   (if payload len==126/127)   |
-| |1|2|3|       |K|             |                               |
-+-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
-|     Extended payload length continued, if payload len == 127  |
-+ - - - - - - - - - - - - - - - +-------------------------------+
-|                               |Masking-key, if MASK set to 1  |
-+-------------------------------+-------------------------------+
-|     Masking-key (continued)   |          Payload Data         |
-+-------------------------------+ - - - - - - - - - - - - - - - +
-:                     Payload Data continued ...                :
-+ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
-|                     Payload Data continued ...                |
-+---------------------------------------------------------------+
-```
-
-Key bits:
-
-- **FIN** — last frame of a message (messages can be split into multiple frames).
-- **Opcode** — `0x1` text, `0x2` binary, `0x8` close, `0x9` ping, `0xA` pong, `0x0` continuation.
-- **MASK** — client→server frames must be masked (XOR with 32-bit key) to prevent cache poisoning attacks on intermediaries.
-- **Payload length** — 7 bits, or 16, or 64 bits for big payloads.
-
----
-
-### Q7. What are control frames?
-
-**Answer:** Frames used for protocol-level signaling, not application data:
-
-- **Close (0x8)** — initiates orderly close, optional status code (1000 normal, 1006 abnormal).
-- **Ping (0x9)** — keepalive probe.
-- **Pong (0xA)** — response to ping.
-
-Control frames are at most 125 bytes and never fragmented.
-
----
-
-### Q8. What is a ping/pong and why use it?
-
-**Answer:** A keepalive mechanism. The server (or client) periodically sends a ping; the peer must respond with a pong. If no pong arrives within a timeout, the connection is presumed dead and closed. Why this matters:
-
-- TCP can keep half-open connections "alive" indefinitely if no data flows.
-- Network middleboxes (NAT, load balancers) drop idle connections — typical NAT timeout 30–120 s.
-- Without ping/pong, a "dead" WebSocket may sit forever, blocking a slot.
-
-Typical interval: 25–45 seconds. Tune below the load balancer's idle timeout.
-
----
-
-### Q9. Why are client→server frames masked?
-
-**Answer:** Without masking, malicious JavaScript could craft WebSocket frames that look like HTTP to misconfigured intermediaries (cache poisoning attack on proxies). Masking with a per-frame random key makes the bytes unpredictable and prevents this. Server→client frames are not masked.
-
----
-
-## Connection Lifecycle
-
-### Q10. Walk through the lifecycle of a WebSocket connection.
-
-```
-TCP handshake
-       │
-HTTP Upgrade request
-       │
-Server returns 101 Switching Protocols
-       │
-WebSocket open ─── application sends/receives frames ───
-       │
-       │ ping/pong keepalives
-       │
-either side sends close frame
-       │
-TCP FIN
-```
-
-States exposed to JavaScript:
-
-| State | Code | Description |
-|-------|------|-------------|
-| CONNECTING | 0 | Handshake in progress |
-| OPEN | 1 | Ready |
-| CLOSING | 2 | Close handshake initiated |
-| CLOSED | 3 | Closed (normal or error) |
-
----
-
-### Q11. What close codes should I know?
-
-| Code | Meaning |
-|------|---------|
-| 1000 | Normal closure |
-| 1001 | Going away (page unload, server shutdown) |
-| 1002 | Protocol error |
-| 1003 | Unsupported data |
-| 1005 | No status received |
-| 1006 | Abnormal closure (no close frame) |
-| 1008 | Policy violation |
-| 1009 | Message too big |
-| 1011 | Server error |
-| 1012 | Service restart |
-| 1013 | Try again later |
-
-`1006` is the most common in production — it indicates the connection was lost without an orderly close (network blip, force-killed process). Treat 1006 differently from 1000 in your reconnect logic.
-
----
-
-## Reconnection and Reliability
-
-### Q12. How should a client reconnect?
-
-**Answer:** Use exponential backoff with jitter. Naïve fixed-interval reconnect creates a thundering herd when the server restarts.
-
-```javascript
-class ResilientSocket {
-  constructor(url) {
-    this.url = url;
-    this.attempt = 0;
-    this.maxBackoff = 30_000;
-    this.connect();
-  }
-
-  connect() {
-    this.ws = new WebSocket(this.url);
-    this.ws.onopen = () => { this.attempt = 0; };
-    this.ws.onclose = (e) => {
-      if (e.code === 1000) return;          // intentional
-      const base = Math.min(1000 * 2 ** this.attempt, this.maxBackoff);
-      const jitter = Math.random() * 0.3 * base;
-      setTimeout(() => this.connect(), base + jitter);
-      this.attempt++;
-    };
-  }
-}
-```
-
-Cap the backoff (often 30 s) and add ±30% jitter. After connecting, replay or resubscribe.
-
----
-
-### Q13. How do you avoid losing messages during reconnect?
-
-**Options:**
-
-1. **Server-side queue per session** — buffer outbound messages keyed by session ID; on reconnect, replay from the last delivered seq.
-2. **Sequence numbers + ACKs** — client tracks last seen sequence; on reconnect, server resends missed records.
-3. **Idempotency keys** — duplicates from "send + crash + retry" are deduplicated downstream.
-4. **Persistent log (Kafka / SSE Last-Event-ID)** — push events to a log, WebSocket gateway reads from it; reconnect resumes from offset.
-
-Without one of these, messages sent during the disconnect window are lost.
-
----
-
-### Q14. How do you detect a half-open connection?
-
-**Answer:** A half-open connection is one where TCP thinks it's alive but the peer is gone (e.g., NAT timed out, peer host crashed). TCP keepalive can take 2 hours by default to detect this.
-
-Detection options:
-
-- **Application-level ping/pong** — primary mechanism, fast detection (seconds).
-- **OS-level TCP keepalive** — tunable but slow.
-- **Server-side timeout on no data received** — close after N seconds of silence.
-
----
-
-## Socket.io vs Raw WebSockets
-
-### Q15. What does Socket.io give you over raw WebSocket?
-
-| Feature | Raw WS | Socket.io |
-|---------|--------|-----------|
-| Transport | WebSocket only | WebSocket with HTTP long-poll fallback |
-| Auto-reconnect | DIY | Built-in with backoff |
-| Rooms / namespaces | DIY | First-class |
-| Acknowledgments per message | DIY | Built-in (`socket.emit(..., ack)`) |
-| Broadcasting | DIY | Built-in |
-| Multi-instance scaling | DIY | Adapter (Redis, Kafka) |
-| Binary support | Yes | Yes (encoded) |
-| Wire protocol | RFC 6455 | Custom on top of WS/HTTP |
-| Interop with non-Socket.io clients | Yes | Only Socket.io clients |
-
-Use Socket.io when you want batteries-included real-time. Use raw WebSocket when you need wire-protocol control, interop with non-JS clients, or minimum overhead.
-
----
-
-### Q16. What are namespaces and rooms in Socket.io?
-
-- **Namespace** — a logical separation, like `/chat`, `/admin`. Each is its own WebSocket-level path; reuses one connection.
-- **Room** — a server-side label grouping sockets within a namespace. Used for broadcasting to subsets.
-
-```javascript
-io.of('/chat').on('connection', (socket) => {
-  socket.join(`room:${roomId}`);
-  io.of('/chat').to(`room:${roomId}`).emit('message', payload);
-});
-```
-
-Rooms are not persistent — they exist only as long as connected sockets are in them.
-
----
-
-### Q17. How do acknowledgments work in Socket.io?
-
-```javascript
-// Client
-socket.emit('save', payload, (ack) => {
-  console.log('server confirmed:', ack);
-});
-
-// Server
-socket.on('save', (payload, ack) => {
-  // ... do work
-  ack({ ok: true, id: 123 });
-});
-```
-
-Wraps the message with a callback ID; the server's response triggers the callback. Useful for request/response semantics on a streaming connection.
-
----
-
-## Authentication and Authorization
-
-### Q18. How do you authenticate a WebSocket connection?
-
-**The handshake is HTTP** — you can use anything HTTP supports:
-
-1. **Cookie** — same-site cookie sent automatically with the upgrade request. Simplest if the WebSocket is on the same origin.
-2. **Authorization header** — server-to-server only; the browser WebSocket API doesn't allow custom headers.
-3. **Token in query string** — `wss://api/ws?token=...`. Convenient but logs/proxies may capture the token.
-4. **Subprotocol header** — pass token as `Sec-WebSocket-Protocol`. Less likely to leak, sent by the browser API.
-5. **Post-connect auth message** — first frame is an auth payload; close on failure.
-
-Validate the token at the Upgrade step. Never accept a connection and trust later messages without auth.
-
----
-
-### Q19. How do you authorize per-message after auth?
-
-**Answer:** Authentication happens once; authorization should be re-checked per action:
-
-- Identify the user from the connection-level claims.
-- For each message, check whether the user is allowed to perform it (post to room X, edit document Y).
-- Cache permissions briefly to avoid hammering an authz service per message.
-- Re-validate on `room.join` / `subscribe` actions.
-
----
-
-### Q20. How do you handle token expiration on a long-lived connection?
-
-**Strategies:**
-
-- **Refresh tokens over the WebSocket itself** — client sends a refresh message before expiration; server updates internal state.
-- **Server enforces max session length** — close after N hours, force reconnection (and reauth).
-- **Periodic re-validation against an auth service** — every M minutes, ask "is this token still valid?" and close if not.
-
-Don't ignore expiration on long connections — a compromised token could otherwise live forever.
-
----
-
-## Scaling WebSockets
-
-### Q21. Why is scaling WebSockets harder than scaling HTTP?
+## Q6. What does a WebSocket frame look like?
 
 **Answer:**
 
-- **Stateful** — each connection is a long-lived TCP socket pinned to one server.
-- **Memory per connection** — modest but adds up (a few KB to tens of KB depending on buffers and library).
-- **Per-instance fan-out problem** — to broadcast to all users, every server holding a relevant connection must do its share.
-- **Sticky sessions usually required** — load balancers must keep the user on the same instance.
-- **Horizontal scaling needs cross-instance message bus** — Redis pub/sub, Kafka, NATS.
+A frame has a tiny header (2-14 bytes) and a payload. Key fields:
 
----
+- `FIN` bit: last fragment of a message?
+- `Opcode`: 0x1 text, 0x2 binary, 0x8 close, 0x9 ping, 0xA pong.
+- `Mask` bit: client→server frames are always masked.
+- Payload length: 7-bit, 16-bit, or 64-bit.
 
-### Q22. How do you broadcast a message to all users when they're spread across N servers?
+You normally never deal with frames directly; the library handles them. But knowing this helps when debugging proxy issues.
 
-**The pub/sub fan-out pattern:**
+## Q7. What are control frames?
 
-```
-            ┌──── server A ──── connections [1..1000]
-publisher → │
-            │     Redis pub/sub / Kafka / NATS
-            │
-            └──── server B ──── connections [1001..2000]
-                  server C ──── connections [2001..3000]
-```
+**Answer:**
 
-1. Each server subscribes to the broadcast channel.
-2. Any server can publish a "broadcast to room X" message to the bus.
-3. Every server that has connections in room X delivers locally.
+Control frames carry connection metadata, not data. The three are `close`, `ping`, and `pong`. They're small (under 125 bytes) and never fragmented. You should respond to a `ping` with a `pong` immediately.
 
-**Redis pub/sub** is most common — fast, simple, no persistence (lost messages on disconnect from Redis are not retried).
+## Q8. What is a ping/pong and why use it?
 
-**Socket.io adapter:** `@socket.io/redis-adapter` does this transparently:
+**Answer:**
 
-```javascript
-const io = new Server();
-io.adapter(createAdapter(pubClient, subClient));
-io.to('room:42').emit('event', payload);  // delivered cluster-wide
+A ping/pong is a heartbeat. The server sends a `ping`; if the client doesn't reply with a `pong` within a timeout, the server considers the connection dead. This catches "half-open" connections where TCP doesn't realize one side is gone (e.g. after a wifi drop).
+
+```js
+const ws = new WebSocket('ws://localhost:8080');
+ws.on('pong', () => { ws.isAlive = true; });
+setInterval(() => {
+  if (!ws.isAlive) return ws.terminate();
+  ws.isAlive = false;
+  ws.ping();
+}, 30000);
 ```
 
----
+## Q9. Why are client→server frames masked?
 
-### Q23. When should you use Kafka instead of Redis pub/sub for fan-out?
+**Answer:**
 
-| Need | Pick |
-|------|------|
-| Sub-millisecond fan-out, lossy okay | Redis pub/sub |
-| Replay missed messages on reconnect | Kafka (read from offset) |
-| Persistence, audit trail | Kafka |
-| Massive fan-out at high throughput | Kafka |
-| Tiny ops footprint | Redis pub/sub |
-
-A common combo: Kafka as the durable log, Redis pub/sub or NATS as the WebSocket fan-out fast path.
+Masking prevents cache poisoning attacks against legacy HTTP proxies. Without masking, a malicious script could craft bytes that look like an HTTP request and trick a proxy. Masking randomizes the payload so it can't be confused with HTTP. Server→client frames are not masked.
 
 ---
 
-### Q24. How many WebSocket connections per server?
+## 3. Connection Lifecycle
 
-**Answer:** Depends on:
+## Q10. Walk through the lifecycle of a WebSocket.
 
-- Memory per connection (Node.js: 5–50 KB; raw Go: 2–10 KB).
-- Message rate.
-- Heartbeat work.
-- Fan-out hot keys.
+**Answer:**
 
-A single tuned Node process can hold ~10–50k connections. With tuning (file descriptor limits, kernel buffer sizes, `epoll`), Go services routinely hold 100k–1M per box. WhatsApp famously held millions per Erlang server.
+```text
+1. Client opens TCP, sends HTTP Upgrade
+2. Server replies 101 Switching Protocols
+3. Both sides exchange frames
+4. Either side sends a Close frame (opcode 0x8)
+5. Other side replies with Close
+6. TCP socket closes
+```
 
-Plan for ~10k per process and scale horizontally.
+```js
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 8080 });
 
----
+wss.on('connection', (ws, req) => {
+  console.log('open from', req.socket.remoteAddress);
 
-### Q25. Sticky vs non-sticky sessions for WebSockets — which?
+  ws.on('message', (data) => {
+    ws.send(`echo: ${data}`);
+  });
 
-**Answer:** **Sticky.** Once a TCP connection is established to server A, all subsequent frames must continue to server A. WebSockets don't survive being load-balanced mid-stream.
+  ws.on('close', (code, reason) => {
+    console.log('closed', code, reason.toString());
+  });
 
-For the **initial handshake** (HTTP/Upgrade), most LBs hash by IP or use a cookie to route. For the long-lived connection, the LB just keeps the TCP socket pinned.
-
-If you must avoid stickiness (rare), use a service mesh that proxies frame-level traffic, or terminate WebSockets at a thin gateway layer that fans out to a stateless backend.
-
----
-
-### Q26. How do you drain WebSocket connections during deployment?
-
-**Graceful shutdown:**
-
-1. Stop accepting new upgrades (LB removes the instance from the pool).
-2. Send a `close` frame with code 1012 ("service restart") or a custom message.
-3. Allow clients to reconnect; clients re-establish to a healthy instance.
-4. Wait for connections to drain or hard-close after a timeout.
-
-```javascript
-process.on('SIGTERM', () => {
-  io.close(() => process.exit(0));        // stops accepting, closes existing
-  setTimeout(() => process.exit(1), 30_000);  // hard-fail safety net
+  ws.on('error', (err) => console.error(err));
 });
 ```
 
-For zero-disruption, push reconnect logic in the client and accept a brief reconnection blip.
+```js
+// Client
+const ws = new WebSocket('ws://localhost:8080');
+ws.onopen = () => ws.send('hello');
+ws.onmessage = (e) => console.log(e.data);
+ws.onclose = (e) => console.log('closed', e.code, e.reason);
+```
+
+## Q11. What close codes should I know?
+
+**Answer:**
+
+| Code | Meaning |
+| --- | --- |
+| 1000 | Normal closure |
+| 1001 | Going away (page closed) |
+| 1006 | Abnormal closure (no close frame) |
+| 1008 | Policy violation |
+| 1011 | Server error |
+| 4000–4999 | Application-defined |
+
+Use 4xxx codes for app-level reasons like "auth expired" or "rate limited" so your client can react specifically.
 
 ---
 
-## Deployment — Load Balancers and Proxies
+## 4. Reconnection and Reliability
 
-### Q27. How do you configure Nginx for WebSockets?
+## Q12. How should a client reconnect?
+
+**Answer:**
+
+Use exponential backoff with jitter. Don't reconnect instantly; thousands of clients flooding back at once will crash the server.
+
+```js
+let attempt = 0;
+
+function connect() {
+  const ws = new WebSocket('wss://example.com/ws');
+
+  ws.onopen = () => { attempt = 0; };
+
+  ws.onclose = () => {
+    const base = Math.min(1000 * 2 ** attempt, 30000);
+    const delay = base + Math.random() * 1000; // jitter
+    attempt++;
+    setTimeout(connect, delay);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+connect();
+```
+
+## Q13. How do you avoid losing messages during reconnect?
+
+**Answer:**
+
+Two strategies:
+
+1. **Resume by sequence number**: server assigns sequence numbers; on reconnect, the client sends "last seen N" and the server replays N+1 onward.
+2. **Out-of-band fetch**: on reconnect, fetch missed data via REST and then resume the live stream.
+
+```js
+ws.onopen = () => ws.send(JSON.stringify({ type: 'resume', lastSeq }));
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  lastSeq = msg.seq;
+  handle(msg);
+};
+```
+
+Server keeps a small ring buffer per session for replay.
+
+## Q14. How do you detect a half-open connection?
+
+**Answer:**
+
+Half-open means TCP thinks the socket is alive but the other side is gone (laptop closed lid, wifi died). The OS won't tell you for minutes. The fix is application-level heartbeats: server pings every N seconds and closes the socket if no pong arrives.
+
+```js
+function heartbeat() { this.isAlive = true; }
+
+wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', heartbeat);
+});
+
+setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+```
+
+---
+
+## 5. Socket.io vs Raw WebSockets
+
+## Q15. What does Socket.io give you over raw WebSocket?
+
+**Answer:**
+
+Socket.io is built on top of WebSockets but adds:
+
+- Auto-reconnect with backoff.
+- Fallback to long polling when WebSocket isn't available.
+- Rooms and namespaces.
+- Acknowledgements (request-reply per message).
+- Built-in JSON encoding.
+- Adapter ecosystem (Redis, MongoDB) for multi-server fan-out.
+
+Trade-off: Socket.io clients can only talk to Socket.io servers; it's not standard WebSocket on the wire.
+
+## Q16. What are namespaces and rooms in Socket.io?
+
+**Answer:**
+
+- A **namespace** is a logical channel like `/chat` or `/admin`; each has its own connection event. Use namespaces to split unrelated features.
+- A **room** is a subset of clients within a namespace; use rooms for per-conversation broadcast.
+
+```js
+const io = require('socket.io')(server);
+const chat = io.of('/chat');
+
+chat.on('connection', (socket) => {
+  socket.on('join', (roomId) => socket.join(roomId));
+  socket.on('msg', (roomId, text) => chat.to(roomId).emit('msg', text));
+});
+```
+
+## Q17. How do acknowledgments work in Socket.io?
+
+**Answer:**
+
+Either side can pass a callback function as the last argument to `emit`. The other side calls it to ack. This gives you request-reply over WebSocket.
+
+```js
+// Server
+socket.on('save', (data, cb) => {
+  saveToDb(data);
+  cb({ ok: true, id: 42 });
+});
+
+// Client
+socket.emit('save', { name: 'foo' }, (resp) => {
+  console.log('saved', resp.id);
+});
+```
+
+---
+
+## 6. Authentication and Authorization
+
+## Q18. How do you authenticate a WebSocket connection?
+
+**Answer:**
+
+The handshake is HTTP, so use HTTP auth: cookies, `Authorization` header, or a query string token.
+
+```js
+// Token in query string (simple, OK for short-lived tokens)
+const ws = new WebSocket(`wss://api.example.com/ws?token=${jwt}`);
+
+// Server
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'http://x');
+  const token = url.searchParams.get('token');
+  const user = verifyJwt(token);
+  if (!user) return ws.close(4401, 'unauthorized');
+  ws.user = user;
+});
+```
+
+Cookies are nicer because they're set automatically by the browser, but watch out for CSRF if your handshake is on a different origin.
+
+## Q19. How do you authorize per-message after auth?
+
+**Answer:**
+
+Once authenticated, attach the user to the socket and check permissions on every incoming message. Don't trust the client to tell you "I'm user 42" on each message.
+
+```js
+ws.on('message', (data) => {
+  const msg = JSON.parse(data);
+  if (msg.type === 'send' && !canSendTo(ws.user, msg.toUserId)) {
+    return ws.close(4403, 'forbidden');
+  }
+});
+```
+
+## Q20. How do you handle token expiration on a long-lived connection?
+
+**Answer:**
+
+Tokens expire, but a WebSocket can stay open for hours. Two approaches:
+
+1. **Re-auth message**: client sends a new token periodically over the socket; server verifies and stores it.
+2. **Force reconnect**: server closes the socket near token expiry; client reconnects with a fresh token.
+
+```js
+// Client refreshes token every 14 minutes for a 15-minute JWT
+setInterval(async () => {
+  const fresh = await refreshToken();
+  ws.send(JSON.stringify({ type: 'auth', token: fresh }));
+}, 14 * 60 * 1000);
+```
+
+---
+
+## 7. Scaling WebSockets
+
+## Q21. Why is scaling WebSockets harder than scaling HTTP?
+
+**Answer:**
+
+HTTP is stateless and any server can handle any request. WebSockets are long-lived and stateful — a connection lives on one server. To broadcast a message to user X, you have to know which server X is on. As you add servers, the fan-out problem grows.
+
+## Q22. How do you broadcast to all users when they're spread across N servers?
+
+**Answer:**
+
+Use a pub/sub backplane. Each server subscribes to a channel; when one server wants to broadcast, it publishes to the channel and every server delivers to its connected users.
+
+```text
+[server 1] - [server 2] - [server 3]
+     \            |            /
+      \           |           /
+        Redis Pub/Sub channel
+```
+
+```js
+// Each WS server
+const sub = redis.duplicate();
+const pub = redis;
+await sub.subscribe('broadcast', (msg) => {
+  wss.clients.forEach((c) => c.send(msg));
+});
+
+// To broadcast from any server:
+pub.publish('broadcast', JSON.stringify({ type: 'announce' }));
+```
+
+For Socket.io, the `socket.io-redis-adapter` does this automatically.
+
+## Q23. When should you use Kafka instead of Redis pub/sub for fan-out?
+
+**Answer:**
+
+| Need | Choice |
+| --- | --- |
+| Low latency, fire-and-forget | Redis pub/sub |
+| Replay missed events | Kafka |
+| Strict durability | Kafka |
+| Millions of msgs/sec | Kafka |
+| Simple, in-memory only | Redis |
+
+Redis pub/sub drops messages if a subscriber disconnects briefly. Kafka retains and lets the subscriber resume.
+
+## Q24. How many WebSocket connections per server?
+
+**Answer:**
+
+It depends on memory per connection and message rate. A bare Node.js `ws` server can hold 50,000–100,000 idle connections per process on a normal VM. With heavy message rates, expect 5,000–20,000.
+
+Limits to watch:
+
+- File descriptors (`ulimit -n`).
+- Ephemeral port range on the OS.
+- Per-connection memory and timers.
+
+## Q25. Sticky vs non-sticky sessions for WebSockets?
+
+**Answer:**
+
+Sticky. A WebSocket lives on one server; the load balancer must route follow-up frames (and reconnects from the same client) to the same server. ALBs and most proxies support sticky sessions via cookies or source IP. With a pub/sub backplane you can still survive losing a server because reconnect lands on a different one.
+
+## Q26. How do you drain WebSocket connections during deployment?
+
+**Answer:**
+
+When a server is shutting down:
+
+1. Stop accepting new connections.
+2. Send each client a "please reconnect" message (with a 4xxx close code).
+3. Wait a few seconds with backoff so reconnects spread across remaining servers.
+4. Close any stragglers and exit.
+
+```js
+process.on('SIGTERM', async () => {
+  server.close(); // stop accepting new connections
+  wss.clients.forEach((ws) => ws.close(4001, 'server-shutdown'));
+  await new Promise((r) => setTimeout(r, 5000));
+  process.exit(0);
+});
+```
+
+---
+
+## 8. Deployment — Load Balancers and Proxies
+
+## Q27. How do you configure Nginx for WebSockets?
+
+**Answer:**
+
+Nginx needs explicit `Upgrade` headers and longer timeouts because WebSockets are long-lived.
 
 ```nginx
-location /ws/ {
-    proxy_pass http://backend;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-    proxy_read_timeout 3600s;            # keep connection open
-    proxy_send_timeout 3600s;
+location /ws {
+  proxy_pass http://app:8080;
+  proxy_http_version 1.1;
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection "upgrade";
+  proxy_set_header Host $host;
+  proxy_read_timeout 3600s;
+  proxy_send_timeout 3600s;
 }
 ```
 
-Critical pieces:
+Without `Upgrade` and `Connection: upgrade`, Nginx will treat the request as plain HTTP and the handshake will fail.
 
-- `proxy_http_version 1.1` — required for upgrade.
-- `Upgrade` and `Connection` headers — pass through the upgrade request.
-- `proxy_read_timeout` — must exceed your ping interval, or Nginx kills the connection.
+## Q28. AWS ALB vs NLB for WebSockets?
 
-Plan ping/pong below the timeout (e.g., 30 s pings under a 60 s timeout).
+**Answer:**
 
----
+- **ALB**: layer 7. Speaks HTTP and WebSocket. Supports cookie-based sticky sessions, path-based routing, and TLS termination. Default choice for most teams.
+- **NLB**: layer 4. Pure TCP. Lower latency, higher throughput, no TLS termination unless you use TLS listeners. Use when you need extreme performance or non-HTTP protocols.
 
-### Q28. AWS ALB vs NLB for WebSockets — which?
+For 99% of WebSocket workloads, ALB is fine.
 
-| Aspect | ALB | NLB |
-|--------|-----|-----|
-| Layer | L7 | L4 |
-| WebSocket support | Yes (handles upgrade) | Yes (transparent at L4) |
-| Idle timeout | Configurable up to 4000 s | 350 s, not configurable |
-| Routing | Path/host/header rules | TCP/UDP only |
-| TLS termination | Yes | Yes (TLS listener) |
-| Cost | Per LCU | Per LCU |
-| Best for | App-aware routing, multiple paths | Ultra low-latency, raw TCP |
+## Q29. What is the typical WebSocket deployment behind a CDN?
 
-**ALB** is the common choice for WebSocket apps. Set idle timeout above your ping interval. **NLB** is better for raw TCP, MQTT, or huge connection counts.
+**Answer:**
 
----
+CDNs traditionally don't accept WebSockets, but Cloudflare and similar now do. The flow is:
 
-### Q29. What is the typical WebSocket deployment behind a CDN?
+```text
+Client -> CDN (TLS termination, DDoS) -> ALB -> WS server -> Redis
+```
 
-**Answer:** Traditional CDNs (CloudFront classic, Fastly) terminate WebSockets at the edge and proxy to origin — but with strict path requirements and timeouts. Many teams bypass the CDN entirely for the WebSocket subdomain (`wss://realtime.example.com`) and only use CDN for static assets.
+Watch out: not every CDN PoP supports WebSocket; check your provider. Idle timeouts are usually 100s, so make heartbeats shorter than that.
 
-If your CDN supports WebSocket origin push, verify:
+## Q30. CORS and WebSockets.
 
-- Idle timeout high enough.
-- Headers preserved.
-- WebSocket subprotocols passed through.
-- Geographic terminating point isn't far from your backend.
+**Answer:**
 
----
+The WebSocket protocol is not subject to the browser's same-origin policy in the same way HTTP is. The browser sends an `Origin` header during handshake; the server should validate it.
 
-### Q30. CORS and WebSockets.
-
-**Answer:** WebSockets do **not** use CORS — they use the `Origin` header at the upgrade step. The server should validate `Origin` and reject unknown origins:
-
-```javascript
-const wss = new WebSocketServer({
-  verifyClient: ({ origin }) => allowedOrigins.has(origin)
+```js
+wss.on('connection', (ws, req) => {
+  const origin = req.headers.origin;
+  if (!ALLOWED.includes(origin)) return ws.close(4403, 'bad origin');
 });
 ```
 
-CORS preflight does not apply because WebSocket isn't a CORS-controlled fetch. But the `Origin` check is the critical defense against cross-site WebSocket hijacking.
+Without this check, any site could open a WebSocket to your server using the visiting user's cookies (cross-site WebSocket hijacking).
 
 ---
 
-## Kubernetes Considerations
+## 9. Kubernetes Considerations
 
-### Q31. How do you run WebSockets on Kubernetes?
+## Q31. How do you run WebSockets on Kubernetes?
 
-- **Service of type ClusterIP** behind an Ingress with WebSocket-aware annotations:
-  ```
-  nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-  nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-  nginx.ingress.kubernetes.io/upstream-hash-by: "$binary_remote_addr"  # sticky
-  ```
-- **HPA** based on CPU is a poor fit — connection count is a better signal. Use a custom metric (active connections) or expose Prometheus metrics.
-- **Pod disruption budget** so rolling updates don't kick all clients at once.
-- **PreStop hook** to stop accepting new connections and gracefully drain.
-- **Avoid frequent restarts** — every restart triggers reconnect storms.
+**Answer:**
 
----
+- Use an ingress controller that supports WebSocket: NGINX Ingress, Traefik, Istio.
+- Set long timeouts (`nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"`).
+- Enable session affinity if your fan-out depends on it; otherwise, use a Redis backplane and let any pod handle any client.
+- Use `terminationGracePeriodSeconds` long enough for connection draining.
 
-### Q32. How do you size pods for WebSocket workloads?
-
-- Target ~10k connections per pod (Node) or ~50k (Go) as a starting point.
-- Right-size memory: connections × per-connection overhead × safety margin.
-- Tune file descriptor limits (`ulimit -n`) — each connection is a socket FD.
-- Kernel: `net.core.somaxconn`, `net.ipv4.tcp_max_syn_backlog`, ephemeral port range.
-
----
-
-## Common Patterns
-
-### Q33. Chat application architecture.
-
-```
-clients ── WebSocket ── ┌─ ws-server-1 ─┐
-                        ├─ ws-server-2 ─┤ ── Redis pub/sub for fan-out
-                        └─ ws-server-3 ─┘
-                                │
-                          message store (Postgres / Cassandra)
-                                │
-                          search index, push, analytics (via Kafka)
+```yaml
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  terminationGracePeriodSeconds: 60
 ```
 
-Per-message flow:
+## Q32. How do you size pods for WebSocket workloads?
 
-1. Client A sends message via WebSocket to server-1.
-2. Server-1 persists to DB.
-3. Server-1 publishes to Redis pub/sub on `room:42`.
-4. All servers with subscribers in `room:42` deliver to their local sockets.
-5. Async pipeline pushes to Kafka for offline notifications, search indexing, etc.
+**Answer:**
 
----
+Memory is usually the limiting factor: each connection needs buffers (~50KB-200KB) plus app state. CPU spikes happen during reconnect storms. Plan for capacity based on:
 
-### Q34. Real-time dashboard.
+- Peak concurrent connections.
+- Heartbeat overhead.
+- Message rate per connection.
 
-- Aggregate metrics in a stream processor.
-- Push deltas to a WebSocket gateway.
-- Coalesce updates (don't push 1000 frames/sec — batch into ~10 fps).
-- Send full snapshots on connect, deltas thereafter.
+Run more, smaller pods to spread blast radius and reconnect load.
 
 ---
 
-### Q35. Notification system.
+## 10. Common Patterns
 
-- Notification service publishes events to Kafka.
-- WebSocket gateway consumes and pushes to connected users.
-- Offline users → push notification (APNs, FCM) or email.
-- Track `last_delivered_id` per user for catch-up on reconnect.
+## Q33. Chat application architecture.
 
----
+**Answer:**
 
-### Q36. Collaborative editing (Google Docs style).
+```text
+[client] --WS--> [edge WS server] --pub--> [Redis pub/sub] --sub--> [other WS servers]
+                          |
+                          v
+                      [Postgres / Cassandra messages table]
+```
 
-Two main approaches:
+- WebSocket servers terminate connections.
+- Each message is persisted before fan-out.
+- Redis (or Kafka) broadcasts to all WS servers so every recipient gets the message regardless of which server they're on.
+- On reconnect, the client fetches missed messages via REST.
 
-| Approach | Description |
-|----------|-------------|
-| Operational Transform (OT) | Operations are transformed against concurrent ops. Centralized server. |
-| CRDTs | Conflict-free replicated data types. Decentralized, eventually consistent. |
+```js
+socket.on('message', async ({ roomId, text }) => {
+  const msg = await db.insertMessage(roomId, text, socket.user.id);
+  await redis.publish(`room:${roomId}`, JSON.stringify(msg));
+});
+```
 
-WebSocket carries the deltas; server may store the canonical document and broadcast operations to all editors. Latency budget is tight (under 100 ms per keystroke roundtrip).
+## Q34. Real-time dashboard.
 
----
+**Answer:**
 
-### Q37. Live multiplayer game.
+Server pushes metrics every N seconds. Clients subscribe to specific dashboards.
 
-- Authoritative server pattern: clients send inputs, server simulates, broadcasts state.
-- Tick-based — server runs at 20–60 Hz, broadcasts state per tick.
-- Use binary frames + delta compression to fit a tick into a small payload.
-- For very low latency, use UDP via WebRTC data channels rather than WebSocket.
-
----
-
-### Q38. Backpressure — what is it and how do you handle it?
-
-**Answer:** When the server produces frames faster than the client (or its network) can consume, the server's send buffer fills up. Without handling, memory grows unbounded.
-
-**Detection:** monitor each socket's `bufferedAmount` (browser) or `socket.write` return value (Node).
-
-**Strategies:**
-
-- **Drop policy** — drop oldest frames; OK for telemetry.
-- **Coalesce** — keep only latest snapshot per topic.
-- **Pause/resume** — stop pushing; resume when buffer drains.
-- **Disconnect slow clients** — protect server health.
-- **Per-client send queues with caps** — bounded memory.
-
-```javascript
-function send(socket, data) {
-  if (socket.bufferedAmount > 1_000_000) {
-    socket.close(1013, 'slow consumer');
-    return;
+```js
+// Server-side periodic push
+setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.dashboard) ws.send(JSON.stringify(getStats(ws.dashboard)));
   }
-  socket.send(data);
+}, 1000);
+```
+
+Use SSE if updates are server-to-client only; WebSocket if the client also sends commands (zoom, filter, drill-down).
+
+## Q35. Notification system.
+
+**Answer:**
+
+A user has a long-lived WS to receive notifications. The notification service publishes to a Redis channel keyed by user id; the WS server forwards to that user's socket.
+
+```js
+sub.subscribe(`user:${ws.user.id}`, (msg) => ws.send(msg));
+```
+
+For users who are offline, store the notification in the database and push a badge count on next connect.
+
+## Q36. Collaborative editing (Google Docs style).
+
+**Answer:**
+
+Two algorithms power this:
+
+- **Operational Transformation (OT)**: each edit is transformed against concurrent edits.
+- **CRDTs (Conflict-free Replicated Data Types)**: edits commute by construction; no central server needed.
+
+WebSocket carries operations between clients. The server applies them in order and broadcasts to other clients in the same document.
+
+```js
+socket.on('op', (op) => {
+  const transformed = doc.apply(op);
+  socket.to(doc.id).emit('op', transformed);
+});
+```
+
+CRDTs (e.g. Yjs, Automerge) are easier today and work peer-to-peer.
+
+## Q37. Live multiplayer game.
+
+**Answer:**
+
+A game server simulates the world tick by tick (e.g. 30 Hz) and sends snapshots/deltas to clients. Clients send input. Latency matters more than throughput. Often UDP via WebRTC is preferred over WebSocket for sub-50ms gameplay.
+
+For turn-based games or simpler real-time games, WebSocket is fine.
+
+## Q38. What is backpressure and how do you handle it?
+
+**Answer:**
+
+Backpressure is when a producer sends faster than a consumer can read. On a WebSocket, the server may try to send 1000 msg/s while the client's network can only handle 100. The OS buffers fill, then the WebSocket library buffers fill, then memory is exhausted.
+
+Detect with `ws.bufferedAmount`:
+
+```js
+if (ws.bufferedAmount > 1_000_000) {
+  // 1 MB queued — drop this update or close
+  ws.close(4008, 'slow consumer');
+  return;
 }
+ws.send(payload);
+```
+
+Strategies: drop old updates, coalesce updates, slow the source, or kick the slow client.
+
+## Q39. Rate limiting on WebSockets.
+
+**Answer:**
+
+Apply token-bucket per connection. Don't trust the client.
+
+```js
+ws.tokens = 10;
+setInterval(() => { ws.tokens = Math.min(10, ws.tokens + 1); }, 100);
+
+ws.on('message', (data) => {
+  if (ws.tokens-- <= 0) return ws.close(4009, 'rate-limited');
+  handle(data);
+});
 ```
 
 ---
 
-### Q39. Rate limiting on WebSockets.
+## 11. Security
 
-Apply at multiple layers:
+## Q40. Common WebSocket security risks?
 
-- **Connection rate** — N upgrades per IP per minute, at the LB or gateway.
-- **Message rate per connection** — token bucket per socket; close on persistent abuse.
-- **Per-user rate** — across all connections from one user.
-- **Topic rate** — limit subscribes/unsubscribes to one room per second.
+**Answer:**
 
-Token bucket and sliding window are common algorithms.
+- **Cross-site WebSocket hijacking**: a malicious site opens a WS to your server using the user's cookies. Validate `Origin` and use CSRF-style tokens.
+- **Lack of origin checks**: see above.
+- **Insufficient auth on messages**: don't trust client claims.
+- **DoS via slow clients or many connections**: rate-limit, cap connections per IP.
+- **Plaintext (`ws://`)**: always use `wss://`.
 
----
+## Q41. Should you use compression on WebSockets?
 
-## Security
+**Answer:**
 
-### Q40. Common WebSocket security risks?
+WebSocket per-message-deflate compresses each frame. It saves bandwidth for text but uses CPU. Risks:
 
-| Risk | Mitigation |
-|------|------------|
-| Cross-Site WebSocket Hijacking | Validate `Origin` header on upgrade |
-| Token leakage in URL | Use subprotocol header or first-frame auth |
-| Man-in-the-middle | Always `wss://` (TLS), never `ws://` over the open internet |
-| Resource exhaustion | Connection caps, rate limits, idle timeouts, max frame size |
-| Injection in messages | Validate every payload — same as HTTP input |
-| Authorization bypass post-connect | Re-check auth per action |
-| Compression amplification (BREACH-like) | Disable per-message-deflate or use carefully |
+- Slightly amplifies CPU attacks.
+- Some libraries have known bugs (memory leaks).
+
+Enable for chat / large JSON; disable for binary or small frequent messages. Always set a `serverMaxWindowBits` and limit memory.
 
 ---
 
-### Q41. Should you use compression on WebSockets?
+## 12. Monitoring and Operations
 
-**Answer:** Per-message-deflate (`permessage-deflate`) can save bandwidth for repetitive JSON. Caveats:
+## Q42. What WebSocket metrics matter?
 
-- Compression context per connection — memory cost.
-- Compression amplification attacks (CRIME-like) if user-controlled data is mixed with secrets.
-- CPU overhead.
+**Answer:**
 
-For high-frequency small messages, compression often hurts more than it helps. Benchmark first.
+| Metric | Why |
+| --- | --- |
+| Concurrent connections | Capacity planning |
+| Connect / disconnect rate | Reconnect storms |
+| Messages/sec in & out | Throughput |
+| Avg & p99 message latency | User experience |
+| Buffered bytes (backpressure) | Slow consumers |
+| Heartbeat failures | Half-open detection |
+| Memory per connection | Tune capacity |
 
----
+## Q43. How do you debug a WebSocket issue?
 
-## Monitoring and Operations
+**Answer:**
 
-### Q42. What WebSocket metrics matter?
+1. Check the handshake: open browser dev tools → Network → WS tab.
+2. Look at close codes; 1006 means "abnormal" (network/proxy issue).
+3. Verify Nginx / ALB has Upgrade headers and long timeouts.
+4. Confirm heartbeats are flowing.
+5. Use `wscat` or `websocat` to test from command line.
 
-| Metric | Purpose |
-|--------|---------|
-| Active connections (per instance, total) | Capacity tracking |
-| Connections per second (open / close) | Churn detection |
-| Bytes in / out per second | Bandwidth |
-| Messages per second | Throughput |
-| Send buffer depth | Backpressure |
-| Ping/pong RTT | Connection health |
-| Disconnect codes (1000 vs 1006 distribution) | Error rate |
-| Time-to-first-message | Reconnect storm detection |
-| CPU per active connection | Efficiency |
-
----
-
-### Q43. How do you debug a WebSocket issue?
-
-- **Browser dev tools** → Network tab → WS filter → frame-by-frame view.
-- **Wireshark / tcpdump** for protocol-level issues (handshake failures).
-- **Server-side per-connection trace logs** (sampled, low rate).
-- **Reproduce against a single instance** by bypassing the LB.
-- **Test with `wscat`** or `websocat` to isolate client vs server bugs.
-- **Watch close codes** — 1006 patterns suggest network/middlebox; 1009 suggests message size; 1011 suggests server bugs.
+```bash
+wscat -c wss://example.com/ws -H "Authorization: Bearer $TOKEN"
+```
 
 ---
 
-## WebRTC and When to Use What
+## 13. WebRTC and When to Use What
 
-### Q44. WebRTC vs WebSocket — what's different?
+## Q44. WebRTC vs WebSocket — what's different?
 
-| Aspect | WebSocket | WebRTC |
-|--------|-----------|--------|
-| Transport | TCP | UDP (with optional reliable channel) |
-| Topology | Client ↔ Server | Peer ↔ Peer (with optional SFU/MCU) |
-| Use case | Bidirectional messaging | Real-time audio/video, low-latency data |
-| NAT traversal | None needed (uses HTTP) | STUN/TURN required |
-| Latency | TCP retransmits add lag | UDP — drop instead of retransmit |
-| Complexity | Low | High |
+**Answer:**
 
-WebRTC includes signaling — but signaling itself is **often done over WebSocket**. WebRTC excels at A/V media and ultra-low-latency P2P data channels (gaming, file transfer).
+| | WebSocket | WebRTC |
+| --- | --- | --- |
+| Topology | Client-server | Peer-to-peer |
+| Transport | TCP | UDP-based (with TCP fallback) |
+| Use cases | Chat, dashboards | Video, voice, low-latency games |
+| Latency | Tens of ms | Low ms, with packet loss tolerance |
+| Setup | Trivial | Complex (signaling, ICE, STUN/TURN) |
 
----
+WebRTC also needs a signaling channel — and that signaling channel is usually WebSocket.
 
-### Q45. When should you choose what?
+## Q45. When should you choose what?
 
-| Need | Pick |
-|------|------|
-| Server pushes data to many clients | SSE or WebSocket |
-| Client and server exchange messages | WebSocket |
-| Bidirectional with HTTP fallback | Socket.io |
-| P2P audio/video | WebRTC |
-| Low-latency data, drop-tolerant | WebRTC data channel (unreliable mode) |
-| Just request/response | HTTP/gRPC |
-| Replay missed events on reconnect | SSE (with Last-Event-ID) or WebSocket on top of Kafka |
+**Answer:**
 
----
-
-## Common Pitfalls
-
-### Q46. Forgetting heartbeat → silent disconnects.
-
-If you don't ping/pong, NAT will kill connections at idle, and your server keeps the socket forever. Always ping; always close on missed pong.
+| Use case | Choice |
+| --- | --- |
+| Browser-to-server real-time | WebSocket |
+| Server pushes only | SSE |
+| Rare updates | Polling |
+| Voice / video / P2P | WebRTC |
+| Real-time game state | WebSocket or WebRTC depending on latency |
 
 ---
 
-### Q47. Reconnect storm on deployment.
+## 14. Common Pitfalls
 
-10k clients all reconnect at the same instant after a deploy → spike on auth service, DB, Redis. Fixes:
+## Q46. Forgetting heartbeat → silent disconnects.
 
-- Jitter in client backoff.
-- Stagger pod rollout.
-- Cache auth results briefly server-side.
-- Pre-warm new instances before draining old ones.
+**Answer:**
 
----
+Without app-level heartbeats, a client that lost its network can stay "connected" on the server for minutes or hours. Memory accumulates and messages are sent into the void. Always implement ping/pong with a timeout, both client and server.
 
-### Q48. State pinned to one instance.
+## Q47. Reconnect storm on deployment.
 
-If your "who is in room X" lives only in instance A's memory, instance B can't broadcast properly. Move shared state to Redis or rebuild on subscribe events.
+**Answer:**
 
----
+If you restart a server, all clients reconnect at once. With 50k clients and naive instant reconnect, the surviving servers may collapse. Mitigate with:
 
-### Q49. Using polling fallback for new browsers.
+- Random jitter on reconnect backoff.
+- Drain connections gradually (Q26).
+- Rolling restart instead of all-at-once.
 
-Don't enable Socket.io's HTTP long-poll fallback unless you need IE11. It significantly increases your server load and complicates ops. WebSocket has been universal since 2012.
+## Q48. State pinned to one instance.
 
----
+**Answer:**
 
-### Q50. Treating WebSocket as a pub/sub bus.
+Storing per-room state only in the WS server's memory means a server restart loses it and broadcasts can't reach users on other servers. Use Redis or another shared store for state, and pub/sub for fan-out.
 
-WebSocket is a **transport**, not a message broker. Don't push 100k connections worth of "every event" to the server and expect it to scale. Use Kafka/Redis as the bus and WebSocket as the last-mile delivery.
+## Q49. Using polling fallback for new browsers.
 
----
+**Answer:**
 
-### Q51. Trusting the client.
+Socket.io's polling fallback is for legacy browsers. On modern browsers, force WebSocket-only to avoid the polling overhead and quirks.
 
-Same as HTTP — never trust the input. Validate every frame against the schema, authorize the action, sanitize before broadcast. A compromised client can do anything a real client could.
+```js
+const io = require('socket.io')(server, { transports: ['websocket'] });
+```
 
----
+## Q50. Treating WebSocket as a pub/sub bus.
 
-### Q52. Senior-level rules of thumb.
+**Answer:**
 
-- Use SSE if data is one-way; WebSocket otherwise.
-- Always `wss://`, validate `Origin`, handle auth at upgrade.
-- Always ping/pong; tune below LB idle timeout.
-- Sticky sessions on the LB.
-- Cluster fan-out via Redis pub/sub (or Kafka for replay).
-- Reconnect with exponential backoff and jitter.
-- Make message handling idempotent and replay-safe.
-- Plan for backpressure and drop or close slow clients.
-- Treat the WebSocket gateway as a thin layer; keep state outside.
-- Monitor active connections, churn, send buffer depth, and close code distribution.
+WebSocket is just a transport. If you build a complex app where many services need to fan out events to many users, don't bolt the pub/sub on the WebSocket protocol; put it in Redis or Kafka behind your WebSocket layer.
+
+## Q51. Trusting the client.
+
+**Answer:**
+
+Treat each incoming message as untrusted input even after auth. Validate types, sizes, and permissions. A logged-in user can still be malicious.
+
+## Q52. Final senior-level rules of thumb.
+
+**Answer:**
+
+- Default to WebSocket only when you actually need bi-directional push.
+- Always heartbeat and auto-reconnect with jitter.
+- Keep state in a shared store; never pin to one instance.
+- Validate `Origin`, use `wss://`, rate-limit per connection.
+- Plan for reconnect storms and slow consumers from day one.
+- Monitor connection counts and buffered bytes, not just CPU.

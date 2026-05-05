@@ -1,709 +1,649 @@
-# HTML and CSS Interview Questions
+# HTML and CSS Interview Questions — Complete Q&A Guide
 
-**Level:** Mid to Senior
-**Topics:** HTML5, Semantics, Accessibility, CSS3, Layout, Modern CSS, Performance, Architecture
+**Focus:** HTML5, semantics, accessibility, CSS3, modern CSS, layout, performance, architecture.
 
----
-
-## Table of Contents
-
-1. [HTML Fundamentals](#html-fundamentals)
-2. [Semantics and Accessibility](#semantics-and-accessibility)
-3. [Forms and Inputs](#forms-and-inputs)
-4. [Web Components](#web-components)
-5. [CSS Fundamentals](#css-fundamentals)
-6. [Layout (Flexbox and Grid)](#layout-flexbox-and-grid)
-7. [Positioning and Stacking](#positioning-and-stacking)
-8. [Responsive Design](#responsive-design)
-9. [Selectors, Specificity, Cascade](#selectors-specificity-cascade)
-10. [Modern CSS](#modern-css)
-11. [Animations and Effects](#animations-and-effects)
-12. [Architecture and Methodologies](#architecture-and-methodologies)
-13. [Performance](#performance)
+Read each answer to understand the concept, then study the code to see how it works in real markup or styles.
 
 ---
 
-## HTML Fundamentals
+## 1. HTML Fundamentals
 
-### Q1. What changed in HTML5 vs HTML4?
-
-**Answer:**
-HTML5 introduced semantic elements (`<header>`, `<nav>`, `<article>`, `<section>`, `<aside>`, `<footer>`, `<main>`, `<figure>`), native multimedia (`<audio>`, `<video>`), the `<canvas>` element, new form input types (`email`, `date`, `number`, `range`), the `<datalist>`, local storage, geolocation, web workers, and a simplified doctype `<!DOCTYPE html>`.
-
-It removed presentation-only elements (`<font>`, `<center>`) in favor of CSS.
-
----
-
-### Q2. What is the difference between `<section>`, `<article>`, and `<div>`?
+## Q1. What changed in HTML5 vs HTML4?
 
 **Answer:**
 
-| Element | Purpose |
-|--------|---------|
-| `<article>` | Self-contained, independently distributable content (blog post, news article, comment) |
-| `<section>` | Thematic grouping of content, typically with a heading |
-| `<div>` | Generic container with no semantic meaning, used for styling/layout |
-
-Rule: if the content could stand alone (RSS feed item), use `<article>`. If it groups related content within a page, use `<section>`. Otherwise, `<div>`.
-
----
-
-### Q3. What does the `lang` attribute do?
-
-**Answer:**
-`<html lang="en">` declares the document language. It improves screen reader pronunciation, helps search engines, enables correct hyphenation rules, and affects spell-check behavior. Always set it.
-
----
-
-### Q4. Difference between `<b>` and `<strong>`, `<i>` and `<em>`?
-
-**Answer:**
-- `<b>` and `<i>` are presentational (bold/italic visual style only).
-- `<strong>` indicates strong importance (semantic, screen readers may emphasize).
-- `<em>` indicates stress emphasis (changes meaning of a sentence).
-
-Use the semantic versions unless purely visual styling is needed.
-
----
-
-### Q5. What is the purpose of the `<meta charset>` and viewport tags?
-
-**Answer:**
+HTML5 introduced semantic elements (`<header>`, `<nav>`, `<article>`, `<section>`, `<footer>`), native multimedia (`<audio>`, `<video>`, `<canvas>`), new form input types (`email`, `date`, `number`), client-side storage APIs (`localStorage`, `sessionStorage`), and a simpler `<!DOCTYPE html>`.
 
 ```html
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8" /></head>
+  <body>
+    <header><h1>Site</h1></header>
+    <main>
+      <article>
+        <video src="demo.mp4" controls></video>
+      </article>
+    </main>
+    <footer>© 2026</footer>
+  </body>
+</html>
 ```
 
-- `charset` defines character encoding (always UTF-8). Must appear in the first 1024 bytes.
-- `viewport` controls layout on mobile. Without it, mobile browsers render at 980px desktop width and zoom out.
-
----
-
-### Q6. What meta tags are critical for SEO?
+## Q2. Difference between `<section>`, `<article>`, and `<div>`?
 
 **Answer:**
 
+- `<article>` is self-contained content that makes sense on its own (a blog post, a product card).
+- `<section>` is a thematic grouping with a heading.
+- `<div>` is a generic container with no semantic meaning — use only when no semantic element fits.
+
 ```html
-<title>Page Title | Brand</title>
-<meta name="description" content="Concise summary under 160 chars.">
-<link rel="canonical" href="https://example.com/page">
-<meta name="robots" content="index, follow">
+<article>
+  <h2>Blog post title</h2>
+  <p>Body...</p>
+</article>
 
-<!-- Open Graph -->
-<meta property="og:title" content="...">
-<meta property="og:description" content="...">
-<meta property="og:image" content="...">
-<meta property="og:url" content="...">
+<section>
+  <h2>Comments</h2>
+  <ul>...</ul>
+</section>
 
-<!-- Twitter Card -->
-<meta name="twitter:card" content="summary_large_image">
+<div class="grid-wrapper">...</div>
 ```
 
-`title` and `description` drive search snippets. `canonical` prevents duplicate content penalties. Open Graph tags control how links appear when shared.
-
----
-
-### Q7. What's the difference between `defer` and `async` on `<script>`?
+## Q3. What does the `lang` attribute do?
 
 **Answer:**
 
-| Attribute | Download | Execution |
-|-----------|----------|-----------|
-| (none) | Blocks parser | Inline, blocks rendering |
-| `async` | Parallel | As soon as ready, may interrupt parsing |
-| `defer` | Parallel | After HTML parse, in document order |
-| `type="module"` | Parallel | Deferred by default |
-
-Use `defer` for scripts that depend on DOM. Use `async` for independent scripts (analytics).
-
----
-
-### Q8. What is the difference between `localStorage`, `sessionStorage`, and cookies?
-
-**Answer:**
-
-| Feature | localStorage | sessionStorage | Cookies |
-|---------|-------------|----------------|---------|
-| Capacity | ~5-10MB | ~5-10MB | ~4KB |
-| Lifetime | Until cleared | Tab close | Configurable |
-| Sent with HTTP | No | No | Yes (per-request overhead) |
-| Accessible from JS | Yes | Yes | Yes (unless `HttpOnly`) |
-
-For auth tokens, prefer `HttpOnly` cookies to mitigate XSS exfiltration.
-
----
-
-### Q9. What are data attributes used for?
-
-**Answer:**
-`data-*` attributes store custom data in HTML accessible via `dataset` in JS:
+`lang` declares the language of the page or element. Screen readers use it to choose the right pronunciation, search engines use it for indexing, and browsers use it for spell-check and hyphenation.
 
 ```html
-<button data-user-id="42" data-action="delete">X</button>
+<html lang="en">
+  <p>Hello</p>
+  <p lang="bn">হ্যালো</p>
+</html>
+```
+
+## Q4. Difference between `<b>` and `<strong>`, `<i>` and `<em>`?
+
+**Answer:**
+
+`<b>` and `<i>` are purely visual (bold and italic). `<strong>` carries semantic importance and `<em>` carries semantic emphasis. Screen readers may announce `<strong>` and `<em>` differently.
+
+```html
+<p><strong>Warning:</strong> the file will be deleted.</p>
+<p>This is <em>really</em> important.</p>
+<p>The keyword <b>fetch</b> is highlighted.</p>
+```
+
+## Q5. What is the purpose of `<meta charset>` and viewport tags?
+
+**Answer:**
+
+`<meta charset="UTF-8">` tells the browser how to decode bytes into characters (always use UTF-8 today). The viewport tag controls scaling on mobile so your page is not zoomed out by default.
+
+```html
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+```
+
+## Q6. What meta tags are critical for SEO?
+
+**Answer:**
+
+```html
+<title>Page title — Site</title>
+<meta name="description" content="Concise summary under 160 chars" />
+<link rel="canonical" href="https://example.com/page" />
+<meta property="og:title" content="Title" />
+<meta property="og:description" content="Description" />
+<meta property="og:image" content="https://example.com/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+```
+
+## Q7. What's the difference between `defer` and `async` on `<script>`?
+
+**Answer:**
+
+| Attribute | When the script runs |
+| --- | --- |
+| (none) | Blocks HTML parsing while downloading and executing. |
+| `async` | Downloads in parallel; runs as soon as ready, may interrupt parsing. |
+| `defer` | Downloads in parallel; runs after HTML is parsed, in document order. |
+
+```html
+<script src="analytics.js" async></script>
+<script src="app.js" defer></script>
+```
+
+Use `defer` for scripts that depend on the DOM. Use `async` for independent scripts like analytics.
+
+## Q8. Difference between `localStorage`, `sessionStorage`, and cookies?
+
+**Answer:**
+
+| | Capacity | Sent to server | Lifetime |
+| --- | --- | --- | --- |
+| `localStorage` | ~5 MB | No | Until cleared |
+| `sessionStorage` | ~5 MB | No | Until tab closes |
+| Cookies | ~4 KB | Yes (every request) | Configurable |
+
+```js
+localStorage.setItem('theme', 'dark');
+sessionStorage.setItem('tabId', '42');
+document.cookie = 'token=abc; path=/; max-age=86400';
+```
+
+For tokens, prefer `httpOnly` cookies set by the server.
+
+## Q9. What are data attributes used for?
+
+**Answer:**
+
+`data-*` attributes store custom data on elements. Read them via the `dataset` property in JS.
+
+```html
+<button data-product-id="42" data-action="add-to-cart">Add</button>
 ```
 
 ```js
 const btn = document.querySelector('button');
-btn.dataset.userId; // "42"
-btn.dataset.action; // "delete"
+console.log(btn.dataset.productId); // "42"
 ```
 
-Useful for hooking JS behavior without polluting the global namespace.
-
 ---
 
-## Semantics and Accessibility
+## 2. Semantics and Accessibility
 
-### Q10. What is semantic HTML and why does it matter?
-
-**Answer:**
-Semantic HTML uses elements that convey meaning (`<nav>`, `<button>`, `<article>`) over generic ones (`<div>`, `<span>`).
-
-Benefits:
-- screen readers announce roles correctly
-- keyboard navigation works without extra code (e.g. `<button>` is focusable, `<div>` is not)
-- search engines understand structure
-- maintainable code
-
-A `<div onclick>` is not a button; it lacks role, focus, and Enter/Space handling.
-
----
-
-### Q11. What is ARIA and when should you use it?
+## Q10. What is semantic HTML and why does it matter?
 
 **Answer:**
-ARIA (Accessible Rich Internet Applications) adds semantics where native HTML can't express them. It includes:
-- **Roles**: `role="dialog"`, `role="tab"`, `role="alert"`
-- **States**: `aria-expanded`, `aria-checked`, `aria-disabled`
-- **Properties**: `aria-label`, `aria-labelledby`, `aria-describedby`
 
-**First rule of ARIA: don't use ARIA.** If a native element does the job (e.g. `<button>`), use it. ARIA is for custom widgets like comboboxes or tabs that have no native equivalent.
+Semantic HTML uses elements that describe their meaning (`<nav>`, `<button>`, `<article>`) rather than generic ones (`<div>`, `<span>`). It improves accessibility, SEO, and code clarity.
 
 ```html
 <!-- Bad -->
-<div class="btn" onclick="...">Save</div>
+<div onclick="submit()">Submit</div>
 
 <!-- Good -->
-<button>Save</button>
-
-<!-- ARIA only when needed -->
-<div role="tab" aria-selected="true" tabindex="0">Tab 1</div>
+<button type="submit">Submit</button>
 ```
 
----
+Buttons get keyboard focus, work with Enter and Space, and are announced by screen readers — for free.
 
-### Q12. How do you make an element keyboard-accessible?
-
-**Answer:**
-
-1. Use native focusable elements (`<button>`, `<a href>`, form inputs).
-2. For custom widgets, add `tabindex="0"` to make focusable in normal order.
-3. Handle keyboard events (Enter/Space for buttons, Arrow keys for menus/tabs).
-4. Provide visible focus styles (`:focus-visible`).
-5. Manage focus on dynamic content (modals trap focus, return focus on close).
-
-```css
-:focus-visible {
-  outline: 2px solid #0066cc;
-  outline-offset: 2px;
-}
-```
-
-Avoid `outline: none` without replacement.
-
----
-
-### Q13. What is the accessibility tree?
-
-**Answer:**
-A parallel tree to the DOM that browsers expose to assistive tech. Each node has a role, name, state, and value. Tools like Chrome DevTools "Accessibility" pane visualize it.
-
-`aria-hidden="true"` removes a node from this tree but keeps it visible in DOM. `display: none` removes from both.
-
----
-
-### Q14. What's the difference between `aria-label`, `aria-labelledby`, and `aria-describedby`?
+## Q11. What is ARIA and when should you use it?
 
 **Answer:**
 
-| Attribute | Purpose |
-|-----------|---------|
-| `aria-label` | Provides accessible name via string |
-| `aria-labelledby` | References ID(s) of element(s) that label it |
-| `aria-describedby` | References ID(s) for additional descriptive text |
+ARIA (Accessible Rich Internet Applications) attributes describe roles, states, and properties to assistive tech. **Rule of thumb: prefer native HTML over ARIA.** Use ARIA only when no native element fits.
 
 ```html
-<button aria-label="Close dialog">X</button>
+<!-- Native is better -->
+<button>Open menu</button>
 
-<input aria-labelledby="email-label" aria-describedby="email-hint">
-<span id="email-label">Email</span>
-<span id="email-hint">We'll never share it.</span>
+<!-- ARIA only when you must build a custom widget -->
+<div role="button" tabindex="0" aria-pressed="false">Toggle</div>
 ```
 
-`labelledby` overrides `aria-label`, which overrides inner text.
-
----
-
-### Q15. How do you make images accessible?
+## Q12. How do you make an element keyboard-accessible?
 
 **Answer:**
-- Meaningful images: use `alt="descriptive text"`.
-- Decorative images: use `alt=""` (empty) so screen readers skip them.
-- Complex images (charts): provide long description nearby or via `aria-describedby`.
-- Don't use `alt="image of..."`; screen readers already announce "image".
-- For SVGs, add `<title>` inside the SVG or `role="img"` with `aria-label`.
 
----
-
-### Q16. What is WCAG and what are the key principles?
-
-**Answer:**
-Web Content Accessibility Guidelines, organized as POUR:
-- **Perceivable**: alt text, captions, sufficient contrast
-- **Operable**: keyboard accessible, no seizure-inducing flashes, enough time
-- **Understandable**: readable, predictable, helpful errors
-- **Robust**: works with assistive tech, valid markup
-
-WCAG levels: A (minimum), AA (legal standard most aim for), AAA (highest). Contrast ratio for AA is 4.5:1 (normal text), 3:1 (large text).
-
----
-
-### Q17. What's a skip link?
-
-**Answer:**
-A link at the top of the page that jumps past navigation to main content for keyboard users. Hidden until focused.
+- Use native interactive elements (`<button>`, `<a>`, `<input>`).
+- For custom elements, add `tabindex="0"` and handle Enter/Space in JS.
+- Show a visible focus outline.
 
 ```html
-<a href="#main" class="skip-link">Skip to main content</a>
-...
-<main id="main">...</main>
+<div role="button" tabindex="0" onkeydown="if(event.key==='Enter')this.click()">
+  Click me
+</div>
+```
+
+## Q13. What is the accessibility tree?
+
+**Answer:**
+
+The accessibility tree is a parallel representation of the DOM that browsers expose to assistive technologies. Each node has a role, name, state, and value. Inspect it with DevTools "Accessibility" panel.
+
+## Q14. Difference between `aria-label`, `aria-labelledby`, and `aria-describedby`?
+
+**Answer:**
+
+- `aria-label="..."` provides a string label.
+- `aria-labelledby="id"` points to the ID of another element whose text is the label.
+- `aria-describedby="id"` points to a description (extra info, like a hint).
+
+```html
+<button aria-label="Close dialog">×</button>
+
+<h2 id="dialog-title">Settings</h2>
+<div role="dialog" aria-labelledby="dialog-title">...</div>
+
+<input aria-describedby="hint" />
+<small id="hint">Use 8 or more characters.</small>
+```
+
+## Q15. How do you make images accessible?
+
+**Answer:**
+
+- Provide `alt` text describing the image's purpose.
+- Use empty `alt=""` for purely decorative images.
+- For complex images (charts), add a longer description nearby.
+
+```html
+<img src="cat.jpg" alt="A black cat sitting on a windowsill" />
+<img src="divider.svg" alt="" />
+```
+
+## Q16. What is WCAG and what are the key principles?
+
+**Answer:**
+
+WCAG (Web Content Accessibility Guidelines) is the standard for web accessibility. Its four principles are POUR:
+
+- **Perceivable** — content can be seen/heard (alt text, captions).
+- **Operable** — works via keyboard.
+- **Understandable** — readable and predictable.
+- **Robust** — works with assistive tech, valid markup.
+
+Levels: A (minimum), AA (target), AAA (rare).
+
+## Q17. What is a skip link?
+
+**Answer:**
+
+A skip link lets keyboard users jump straight to the main content, bypassing repeated navigation.
+
+```html
+<body>
+  <a class="skip" href="#main">Skip to main content</a>
+  <nav>...</nav>
+  <main id="main">...</main>
+</body>
 ```
 
 ```css
-.skip-link {
-  position: absolute;
-  left: -9999px;
-}
-.skip-link:focus {
-  left: 0;
-  top: 0;
-}
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 1rem; top: 1rem; }
 ```
 
 ---
 
-## Forms and Inputs
+## 3. Forms and Inputs
 
-### Q18. What input types does HTML5 provide?
-
-**Answer:**
-`text`, `password`, `email`, `tel`, `url`, `number`, `range`, `date`, `datetime-local`, `month`, `week`, `time`, `color`, `search`, `file`, `checkbox`, `radio`, `hidden`, `submit`, `button`, `reset`.
-
-Mobile keyboards adapt to type (`tel` shows numeric pad, `email` shows `@` key). Browsers provide built-in pickers for `date` and `color`.
-
----
-
-### Q19. How does HTML5 form validation work?
+## Q18. What input types does HTML5 provide?
 
 **Answer:**
-Built-in validation via attributes:
+
+`text`, `email`, `password`, `number`, `tel`, `url`, `search`, `date`, `time`, `datetime-local`, `month`, `week`, `color`, `range`, `file`, `checkbox`, `radio`, `hidden`. They give native validation, mobile keyboards, and pickers.
+
+```html
+<input type="email" required />
+<input type="number" min="0" max="100" step="1" />
+<input type="date" />
+<input type="color" />
+```
+
+## Q19. How does HTML5 form validation work?
+
+**Answer:**
+
+Attributes like `required`, `minlength`, `maxlength`, `pattern`, `min`, `max` trigger automatic validation. The browser shows an error and prevents submission.
 
 ```html
 <form>
-  <input type="email" required>
-  <input type="text" pattern="[A-Za-z]{3,10}" minlength="3" maxlength="10">
-  <input type="number" min="1" max="100" step="1">
+  <input name="email" type="email" required />
+  <input name="age" type="number" min="18" required />
+  <input name="zip" pattern="\d{5}" title="5 digits" />
   <button>Submit</button>
 </form>
 ```
 
-Browser blocks submission and shows native UI on invalid input. Customize with the Constraint Validation API:
+Customize the message via JavaScript:
 
 ```js
-input.setCustomValidity('Username must be unique');
-input.checkValidity();
-input.reportValidity();
+input.setCustomValidity('Please enter a valid email');
 ```
 
-CSS hooks: `:valid`, `:invalid`, `:required`, `:user-invalid` (only after interaction).
-
-Disable native UI with `novalidate` if you handle validation yourself.
-
----
-
-### Q20. What does `autocomplete` do and why is it important?
-
-**Answer:**
-`autocomplete` tells the browser/password manager what kind of data goes in a field (`email`, `name`, `current-password`, `new-password`, `one-time-code`, `cc-number`, `street-address`, etc.).
-
-Correct autocomplete values:
-- enable password manager auto-fill
-- enable address auto-fill
-- improve form completion rates dramatically
-- aid accessibility (some screen readers use these hints)
-
-```html
-<input type="password" autocomplete="current-password">
-<input type="password" autocomplete="new-password">
-<input name="otp" autocomplete="one-time-code">
-```
-
----
-
-### Q21. How do you associate a label with an input?
+## Q20. What does `autocomplete` do and why is it important?
 
 **Answer:**
 
+`autocomplete` tells the browser what kind of value the field expects, enabling autofill from saved credentials, addresses, or payment methods.
+
 ```html
-<!-- Explicit (preferred) -->
+<input name="email" type="email" autocomplete="email" />
+<input name="cc-number" autocomplete="cc-number" />
+<input name="address" autocomplete="street-address" />
+```
+
+## Q21. How do you associate a label with an input?
+
+**Answer:**
+
+Use `for` matching the input's `id`, or wrap the input inside the `<label>`.
+
+```html
+<!-- Method 1 -->
 <label for="email">Email</label>
-<input id="email" type="email">
+<input id="email" type="email" />
 
-<!-- Implicit (wrapping) -->
+<!-- Method 2 -->
 <label>
-  Email
-  <input type="email">
+  Password
+  <input type="password" />
 </label>
 ```
 
-Avoid `placeholder` as a label (disappears on input, low contrast, fails WCAG). Use a real `<label>` plus `placeholder` for example text.
-
----
-
-### Q22. How do you build accessible custom form controls?
-
-**Answer:**
-Prefer native first. If you must build custom (e.g. styled select):
-- maintain a native hidden input for form submission
-- assign appropriate `role` (`combobox`, `listbox`, `option`)
-- manage `aria-expanded`, `aria-activedescendant`, `aria-selected`
-- handle keyboard (Arrow keys, Enter, Escape, Home/End, type-ahead)
-- ensure focus visibility and trapping
-
-Use established libraries (Headless UI, Radix, React Aria) — accessible widgets are deceptively complex.
-
----
-
-## Web Components
-
-### Q23. What are web components?
-
-**Answer:**
-A set of standards for reusable, encapsulated custom HTML elements:
-- **Custom Elements**: define new tags via `customElements.define()`
-- **Shadow DOM**: encapsulated DOM and styles
-- **HTML Templates**: `<template>` and `<slot>` for reusable markup
-- **ES Modules**: standardized JS imports
-
-Framework-agnostic — usable in React, Vue, plain HTML alike.
-
----
-
-### Q24. How do you define a custom element?
+## Q22. How do you build accessible custom form controls?
 
 **Answer:**
 
-```js
-class MyButton extends HTMLElement {
-  static observedAttributes = ['disabled'];
+When wrapping or replacing native inputs:
 
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-  }
-
-  connectedCallback() {
-    const tpl = document.getElementById('my-button-tpl');
-    this.shadowRoot.append(tpl.content.cloneNode(true));
-  }
-
-  attributeChangedCallback(name, oldVal, newVal) {
-    if (name === 'disabled') {
-      this.shadowRoot.querySelector('button').disabled = newVal !== null;
-    }
-  }
-
-  disconnectedCallback() { /* cleanup */ }
-}
-customElements.define('my-button', MyButton);
-```
+- Forward `id`, `name`, `value`, validation state.
+- Use the right ARIA role (`role="checkbox"`, `aria-checked`).
+- Make focusable with `tabindex="0"`.
+- Handle keyboard events (Space toggles a checkbox).
 
 ```html
-<template id="my-button-tpl">
-  <style>button { padding: 8px 16px; }</style>
-  <button><slot></slot></button>
-</template>
-
-<my-button disabled>Click</my-button>
+<div role="checkbox" tabindex="0" aria-checked="false" id="terms">
+  I accept the terms
+</div>
 ```
-
-Custom element names must contain a hyphen. Using `<template>` plus `cloneNode` is preferred over building markup as strings — it's safer and lets the browser parse once.
 
 ---
 
-### Q25. What is Shadow DOM and why use it?
+## 4. Web Components
+
+## Q23. What are web components?
 
 **Answer:**
-Shadow DOM creates an isolated DOM subtree. Styles inside don't leak out, and outside CSS doesn't bleed in (except inherited properties and CSS custom properties).
+
+Web components are a set of standards for building reusable, encapsulated custom elements: Custom Elements, Shadow DOM, HTML Templates, and ES Modules. They work in any framework or none.
+
+```html
+<my-counter></my-counter>
+```
+
+## Q24. How do you define a custom element?
+
+**Answer:**
+
+```html
+<my-counter></my-counter>
+
+<script>
+class MyCounter extends HTMLElement {
+  connectedCallback() {
+    this.count = 0;
+    this.innerHTML = `<button>0</button>`;
+    this.querySelector('button').addEventListener('click', () => {
+      this.count++;
+      this.querySelector('button').textContent = this.count;
+    });
+  }
+}
+customElements.define('my-counter', MyCounter);
+</script>
+```
+
+## Q25. What is Shadow DOM and why use it?
+
+**Answer:**
+
+Shadow DOM creates an isolated DOM tree inside an element, with scoped CSS. Styles inside do not leak out, and outside styles do not leak in (by default).
 
 ```js
-this.attachShadow({ mode: 'open' });
-const style = document.createElement('style');
-style.textContent = 'p { color: red; }';
-const p = document.createElement('p');
-p.textContent = 'Hi';
-this.shadowRoot.append(style, p);
+class MyCard extends HTMLElement {
+  constructor() {
+    super();
+    const shadow = this.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `
+      <style>p { color: red; }</style>
+      <p><slot></slot></p>
+    `;
+  }
+}
+customElements.define('my-card', MyCard);
 ```
 
-`mode: 'open'` allows external `el.shadowRoot` access; `closed` doesn't.
+## Q26. How do you style Shadow DOM from outside?
 
-Use for: design-system primitives, third-party widgets that must not collide with host styles. Trade-off: harder to theme; styles must opt-in via CSS variables or `::part()`.
+**Answer:**
+
+Use CSS custom properties (they pierce Shadow DOM) or `::part()` selectors.
+
+```html
+<my-button class="primary">Click</my-button>
+
+<style>
+my-button { --bg: blue; }
+my-button::part(label) { font-weight: bold; }
+</style>
+```
+
+```js
+shadow.innerHTML = `
+  <style>button { background: var(--bg); }</style>
+  <button part="label"><slot></slot></button>
+`;
+```
 
 ---
 
-### Q26. How do you style Shadow DOM from outside?
+## 5. CSS Fundamentals
+
+## Q27. Explain the CSS box model.
 
 **Answer:**
-- **CSS custom properties** pierce the shadow boundary:
-  ```css
-  my-button { --btn-bg: red; }
-  /* inside shadow */
-  button { background: var(--btn-bg); }
-  ```
-- **`::part()`** lets the component expose stylable parts:
-  ```html
-  <!-- inside -->
-  <button part="trigger">...</button>
-  ```
-  ```css
-  my-button::part(trigger) { color: blue; }
-  ```
-- **`::slotted()`** styles content projected via `<slot>`.
 
----
-
-## CSS Fundamentals
-
-### Q27. Explain the CSS box model.
-
-**Answer:**
-Every element is a rectangular box made of:
-- **Content** (width by height)
-- **Padding** (inside, between content and border)
-- **Border**
-- **Margin** (outside, between this box and others)
-
-`box-sizing: content-box` (default): `width` = content. Total width = content + padding + border.
-
-`box-sizing: border-box`: `width` = content + padding + border. More predictable; almost universally preferred.
+Every element is a rectangle made of content, padding, border, and margin. Width and height by default refer to the content box; total visible size includes padding and border.
 
 ```css
-*, *::before, *::after { box-sizing: border-box; }
+* { box-sizing: border-box; } /* width includes padding + border */
+
+.box {
+  width: 200px;
+  padding: 16px;
+  border: 2px solid;
+  margin: 8px;
+}
 ```
 
----
+`box-sizing: border-box` is universally preferred — it makes layouts predictable.
 
-### Q28. What is margin collapsing?
+## Q28. What is margin collapsing?
 
 **Answer:**
-Adjacent vertical margins of block-level elements collapse into a single margin equal to the larger of the two (not the sum). Happens between siblings, parent and first/last child (without padding/border between), and empty blocks.
 
-Prevents: padding, border, `display: flex`/`grid`, `overflow` other than visible, floats, absolute positioning.
+Vertical margins of adjacent block elements collapse into the larger of the two, not the sum. It happens with siblings, parent-child, and empty blocks.
 
-Horizontal margins never collapse. Flex and grid item margins never collapse.
+```html
+<p style="margin-bottom: 30px">A</p>
+<p style="margin-top: 20px">B</p>
+<!-- gap is 30px, not 50px -->
+```
 
----
+Prevent collapsing by adding padding/border to the parent, or using flex/grid.
 
-### Q29. What's the difference between `display` values?
+## Q29. What's the difference between `display` values?
 
 **Answer:**
 
 | Value | Behavior |
-|-------|----------|
-| `block` | Full-width line, respects width/height |
-| `inline` | Flows in line, ignores width/height/vertical margin |
-| `inline-block` | Inline flow, respects width/height |
-| `flex` | Flex container; children become flex items |
-| `inline-flex` | Inline-level flex container |
+| --- | --- |
+| `block` | Full width, stacks vertically |
+| `inline` | Sits in text flow, ignores width/height |
+| `inline-block` | Like inline but accepts width/height |
+| `flex` | Flex container |
 | `grid` | Grid container |
-| `contents` | Element disappears from layout; children promoted to its parent's box |
-| `none` | Removed from layout entirely |
-| `flow-root` | Establishes new block formatting context (e.g. clears floats) |
-
-`display: contents` is useful for unwrapping a wrapper (e.g. component root) without losing semantics, but it has accessibility bugs in older browsers — verify before relying on it.
-
----
-
-### Q30. What units exist in CSS and when should you use each?
-
-**Answer:**
-
-| Unit | Description | Use case |
-|------|-------------|----------|
-| `px` | Absolute pixel | Borders, fine details |
-| `em` | Relative to parent font-size | Component-relative spacing |
-| `rem` | Relative to root font-size | Most sizing (typography, spacing) |
-| `%` | Relative to parent's same property | Fluid widths |
-| `vw`/`vh` | 1% of viewport | Hero sections, full-screen |
-| `vmin`/`vmax` | 1% of smaller/larger viewport dim | Square layouts |
-| `svh`/`lvh`/`dvh` | Small/large/dynamic viewport height | Mobile (handles browser chrome) |
-| `ch` | Width of `0` glyph | Reading-line length |
-| `ex` | x-height | Rare typography |
-| `fr` | Fractional grid space | Grid tracks |
-
-Prefer `rem` for sizes that should scale with user preference; `em` for component-internal scaling.
-
----
-
-### Q31. What's the difference between `em` and `rem`?
-
-**Answer:**
-- `em` is relative to the **current element's** font-size (or parent's if setting `font-size` itself).
-- `rem` is relative to the **root** (`<html>`) font-size.
-
-`em` compounds: nesting elements with `font-size: 1.2em` gets exponentially bigger. `rem` is predictable.
+| `none` | Removes from layout and accessibility tree |
+| `contents` | Element disappears, children promote up |
 
 ```css
-html { font-size: 16px; }   /* 1rem = 16px */
-.card { font-size: 1.2em; } /* 19.2px */
-.card .title { font-size: 1.2em; } /* 23.04px (compounds!) */
-.card .title { font-size: 1.2rem; } /* 19.2px (consistent) */
+.menu { display: flex; }
+.card { display: grid; }
 ```
 
-User accessibility: don't set `html { font-size: ... }` in `px`; lock to default `100%` so users can change browser zoom/font size.
-
----
-
-### Q32. What are CSS custom properties (variables)?
+## Q30. What units exist in CSS?
 
 **Answer:**
+
+- Absolute: `px`, `pt`, `cm`.
+- Relative to font: `em`, `rem`, `ch`, `ex`.
+- Relative to viewport: `vw`, `vh`, `vmin`, `vmax`, `dvh`, `svh`, `lvh`.
+- Percentages: `%` of parent.
+- Fractions: `fr` for grid.
+
+```css
+.title { font-size: 1.5rem; }
+.hero { height: 100dvh; }
+.grid { grid-template-columns: 1fr 2fr; }
+```
+
+## Q31. Difference between `em` and `rem`?
+
+**Answer:**
+
+`em` is relative to the parent's font-size (compounds in nested elements). `rem` is relative to the root (`<html>`) font-size.
+
+```css
+html { font-size: 16px; }
+.card { font-size: 1.5em; }       /* 24px */
+.card .badge { font-size: 0.9em; } /* 0.9 × 24 = 21.6px */
+.btn { font-size: 1.2rem; }       /* always 19.2px */
+```
+
+`rem` is preferred for predictable sizing.
+
+## Q32. What are CSS custom properties (variables)?
+
+**Answer:**
+
+Custom properties start with `--` and are read with `var()`. They are dynamic and inherit through the cascade.
 
 ```css
 :root {
-  --primary: #0066cc;
-  --space: 1rem;
+  --primary: #4f46e5;
+  --radius: 8px;
 }
 
-.button {
+.btn {
   background: var(--primary);
-  padding: var(--space);
+  border-radius: var(--radius);
+}
+
+.theme-dark {
+  --primary: #7c3aed; /* override in subtree */
 }
 ```
 
-Differences from preprocessor variables (Sass):
-- live in cascade — can be overridden per selector
-- accessible at runtime via JS (`getPropertyValue`/`setProperty`)
-- can change in media queries, attributes, hover
-
-```css
-[data-theme="dark"] { --primary: #4488ff; }
-@media (prefers-color-scheme: dark) { :root { --bg: #111; } }
-```
-
-Crucial for: theming, dark mode, design tokens, dynamic values from JS.
-
-Fallback: `var(--missing, blue)`.
-
----
-
-### Q33. What is the difference between inheritance, the cascade, and specificity?
+## Q33. Difference between inheritance, the cascade, and specificity?
 
 **Answer:**
 
-- **Inheritance**: some properties (color, font, line-height) pass from parent to child by default. Others (margin, border) don't.
-- **Cascade**: the algorithm that picks one declaration when multiple apply, based on origin, layer, specificity, source order, and `!important`.
-- **Specificity**: a weight (a, b, c) — inline styles (1,0,0,0) > IDs (0,1,0,0) > classes/attributes/pseudo-classes (0,0,1,0) > elements/pseudo-elements (0,0,0,1).
-
-`*`, `:where()` have specificity 0. `:is()` takes the highest specificity of its argument list.
-
----
-
-## Layout (Flexbox and Grid)
-
-### Q34. Explain `flex-grow`, `flex-shrink`, `flex-basis`.
-
-**Answer:**
-
-`flex` shorthand: `flex-grow flex-shrink flex-basis`.
-
-- **flex-basis**: the initial size before free space is distributed. `auto` = use `width`/content size.
-- **flex-grow**: how much of remaining free space this item takes. Items with grow=2 take 2x what grow=1 items take.
-- **flex-shrink**: how much an item shrinks when there isn't enough space. shrink=0 prevents shrinking.
+- **Inheritance** — some properties (`color`, `font-family`) inherit from parent to child.
+- **Cascade** — when multiple rules apply, the browser picks one based on origin → specificity → source order.
+- **Specificity** — a score per selector: inline (1000) > IDs (100) > classes/attrs/pseudo-classes (10) > elements (1).
 
 ```css
-.item { flex: 1 1 0; }     /* equal columns, growing/shrinking */
-.item { flex: 0 0 200px; } /* fixed 200px, no flex */
-.item { flex: 1; }         /* shorthand for 1 1 0% */
-.item { flex: auto; }      /* 1 1 auto — grows from content size */
-```
-
-Common gotcha: `flex: 1` differs from `flex: auto` — the first ignores content size, the second considers it.
-
----
-
-### Q35. How do you center an element vertically and horizontally?
-
-**Answer:**
-
-Flex (most common):
-```css
-.parent { display: flex; align-items: center; justify-content: center; }
-```
-
-Grid:
-```css
-.parent { display: grid; place-items: center; }
-```
-
-Absolute positioning (legacy fallback):
-```css
-.child { position: absolute; inset: 0; margin: auto; }
-/* or */
-.child { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.button.primary { color: blue; }   /* (0,2,0) wins */
+.button { color: red; }             /* (0,1,0) */
+button { color: black; }            /* (0,0,1) */
 ```
 
 ---
 
-### Q36. What's the difference between `justify-content`, `align-items`, `align-content`?
+## 6. Layout — Flexbox and Grid
+
+## Q34. Explain `flex-grow`, `flex-shrink`, `flex-basis`.
 
 **Answer:**
-In flexbox (default `flex-direction: row`):
-- `justify-content`: alignment along the **main axis** (horizontal)
-- `align-items`: alignment along the **cross axis** (vertical) for a single line
-- `align-content`: alignment of multiple lines (only when wrapping)
 
-`align-self` overrides `align-items` for a single item.
+- `flex-basis` is the initial size before free space is distributed.
+- `flex-grow` is the share of leftover space the item takes (default 0).
+- `flex-shrink` is how much the item shrinks when there is too little space (default 1).
 
-In grid, axes are independent of direction; `place-items` is shorthand for `align-items justify-items`.
+```css
+.item {
+  flex: 1 1 200px; /* grow shrink basis */
+}
+```
 
----
+`flex: 1` is shorthand for `1 1 0` — equal-width items.
 
-### Q37. Explain CSS Grid `fr` units, `auto`, and `minmax`.
+## Q35. How do you center an element vertically and horizontally?
 
 **Answer:**
+
+```css
+/* Flexbox */
+.parent {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Grid */
+.parent {
+  display: grid;
+  place-items: center;
+}
+
+/* Absolute */
+.child {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+```
+
+## Q36. Difference between `justify-content`, `align-items`, `align-content`?
+
+**Answer:**
+
+In flex (default row direction):
+
+- `justify-content` — main axis (horizontal).
+- `align-items` — cross axis (vertical) for each line.
+- `align-content` — cross axis when there are multiple lines.
+
+```css
+.flex {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  align-content: stretch;
+}
+```
+
+## Q37. Explain CSS Grid `fr` units, `auto`, and `minmax`.
+
+**Answer:**
+
+- `fr` distributes leftover space proportionally.
+- `auto` sizes to content.
+- `minmax(min, max)` defines a range.
 
 ```css
 .grid {
   display: grid;
-  grid-template-columns: 200px 1fr 2fr minmax(100px, 300px) auto;
+  grid-template-columns: 200px 1fr 2fr;
+  grid-template-rows: minmax(100px, auto);
 }
 ```
 
-- `200px`: fixed
-- `1fr`: takes 1 part of remaining space
-- `2fr`: takes 2 parts
-- `minmax(100px, 300px)`: between 100 and 300px
-- `auto`: sized to content
-
-`fr` distributes leftover space *after* fixed and content-sized tracks are accounted for.
-
----
-
-### Q38. What are grid template areas?
+## Q38. What are grid template areas?
 
 **Answer:**
-Named layouts using string syntax:
+
+Visual layout using named areas.
 
 ```css
 .layout {
@@ -712,301 +652,282 @@ Named layouts using string syntax:
   grid-template-rows: auto 1fr auto;
   grid-template-areas:
     "header header"
-    "sidebar main"
+    "side   main"
     "footer footer";
 }
-header { grid-area: header; }
-aside { grid-area: sidebar; }
-main { grid-area: main; }
-footer { grid-area: footer; }
+.header { grid-area: header; }
+.side   { grid-area: side; }
+.main   { grid-area: main; }
+.footer { grid-area: footer; }
 ```
 
-Easy to reflow with media queries by re-defining `grid-template-areas`.
-
----
-
-### Q39. What is auto-placement in CSS Grid?
+## Q39. What is auto-placement in CSS Grid?
 
 **Answer:**
-Items without explicit position are auto-placed by the grid algorithm.
+
+When you do not specify positions, Grid auto-places items in available cells. `grid-auto-flow: row` (default) or `column` controls direction. `grid-auto-rows`/`grid-auto-columns` size the implicit tracks.
 
 ```css
-.gallery {
+.grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  grid-auto-rows: 200px;
-  grid-auto-flow: dense;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 100px;
+  gap: 1rem;
 }
 ```
 
-- `auto-fill`: creates as many tracks as fit, possibly empty
-- `auto-fit`: same, but collapses empty tracks (children stretch)
-- `grid-auto-flow: dense`: backfills holes, may reorder visually (caution: changes reading order)
-
-`grid-auto-rows`/`grid-auto-columns` size implicitly created tracks.
-
----
-
-### Q40. What is subgrid?
+## Q40. What is subgrid?
 
 **Answer:**
-A grid item with `display: grid` can opt into the parent's track sizes for either axis:
+
+`subgrid` lets a nested grid use the parent's tracks instead of defining its own — keeping items aligned across nesting levels.
 
 ```css
-.parent { display: grid; grid-template-columns: 1fr 1fr 1fr; }
+.parent {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+}
 .child {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: subgrid;
+  grid-column: 1 / -1;
 }
 ```
 
-Useful for aligning nested content (e.g. card titles and footers across rows). Supported in all modern browsers as of 2023+.
-
----
-
-### Q41. When should you use Flexbox vs Grid?
+## Q41. When should you use Flexbox vs Grid?
 
 **Answer:**
 
-| Flexbox | Grid |
-|---------|------|
-| One-dimensional (row OR column) | Two-dimensional (row AND column) |
-| Content-driven sizing | Layout-driven sizing |
-| Navigation bars, button groups | Page layouts, photo galleries |
-| Distributing items in a line | Aligning items in two axes |
+- Flexbox is one-dimensional — best for navbars, button rows, vertical stacks.
+- Grid is two-dimensional — best for page layouts, dashboards, photo galleries.
 
-You can and should combine them — Grid for the page, Flex within cells.
+You can use both together: Grid for the page, Flex inside cards.
 
 ---
 
-## Positioning and Stacking
+## 7. Positioning and Stacking
 
-### Q42. Explain CSS `position` values.
+## Q42. Explain CSS `position` values.
 
 **Answer:**
 
 | Value | Behavior |
-|-------|----------|
-| `static` | Default; in normal flow, ignores `top/left/...` |
-| `relative` | In flow, but offsetable; creates positioning context |
-| `absolute` | Removed from flow, positioned relative to nearest positioned ancestor |
-| `fixed` | Removed from flow, positioned relative to viewport (or transformed ancestor!) |
-| `sticky` | In flow until scroll threshold, then sticks |
+| --- | --- |
+| `static` | Default, normal flow |
+| `relative` | In flow, but `top/left/right/bottom` shift it |
+| `absolute` | Out of flow, positioned to nearest positioned ancestor |
+| `fixed` | Out of flow, positioned to viewport |
+| `sticky` | In flow, sticks to a position when scrolling past |
 
 ```css
-.header { position: sticky; top: 0; }
+.tooltip {
+  position: absolute;
+  top: 100%;
+  left: 0;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+}
 ```
 
-Sticky requires a scrollable ancestor without `overflow: hidden` and a defined inset (`top`, `bottom`, etc.).
-
-Gotcha: `position: fixed` is positioned relative to the nearest ancestor with a `transform`, `filter`, `perspective`, `will-change`, or `contain: paint/layout` — not always the viewport.
-
----
-
-### Q43. What is a stacking context and how is it created?
+## Q43. What is a stacking context and how is it created?
 
 **Answer:**
-A stacking context is a self-contained 3D layer where `z-index` is compared. Children's `z-index` only competes within their parent's context.
 
-Triggers:
-- root element
-- `position: relative/absolute` with `z-index` other than `auto`
-- `position: fixed` or `sticky`
+A stacking context is a group of elements whose `z-index` only competes with siblings inside the same context. Created by:
+
+- `position: relative/absolute/fixed/sticky` with `z-index` set
 - `opacity` < 1
-- `transform`, `filter`, `mask`, `perspective`, `clip-path` other than none
-- `will-change` of any of the above
+- `transform`, `filter`, `perspective`
 - `isolation: isolate`
-- `mix-blend-mode` other than normal
-
-Common gotcha: a `z-index: 9999` child inside a parent with `opacity: 0.99` can never escape that parent. Solution: `isolation: isolate` on the right ancestor.
-
----
-
-### Q44. What does `isolation: isolate` do?
-
-**Answer:**
-Forces a new stacking context without other side effects. Useful to scope `z-index` or `mix-blend-mode` without resorting to `transform` or `opacity` hacks.
-
----
-
-## Responsive Design
-
-### Q45. What are media queries?
-
-**Answer:**
-Conditional CSS based on viewport or device features:
+- `will-change`
 
 ```css
-@media (min-width: 768px) { ... }
-@media (max-width: 767.98px) { ... }
-@media (orientation: landscape) { ... }
-@media (prefers-color-scheme: dark) { ... }
-@media (prefers-reduced-motion: reduce) { ... }
-@media (hover: hover) and (pointer: fine) { ... }
-@media print { ... }
+.card {
+  position: relative;
+  z-index: 1; /* creates a stacking context */
+}
 ```
 
-Mobile-first preferred: write base styles for small screens, layer larger breakpoints with `min-width`.
+## Q44. What does `isolation: isolate` do?
 
-Range syntax (newer): `@media (width >= 768px)`.
+**Answer:**
+
+It creates a new stacking context without needing `position` or `z-index`. Useful to keep `mix-blend-mode` or stacked elements from leaking into ancestors.
+
+```css
+.section { isolation: isolate; }
+```
 
 ---
 
-### Q46. What are container queries and how do they differ from media queries?
+## 8. Responsive Design
+
+## Q45. What are media queries?
 
 **Answer:**
-Container queries respond to a parent's size, not the viewport.
+
+Media queries apply CSS based on viewport size, orientation, color scheme, or other features.
 
 ```css
-.card-container {
+@media (min-width: 768px) {
+  .card { padding: 2rem; }
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background: #111; color: #eee; }
+}
+
+@media (orientation: landscape) {
+  .hero { height: 60vh; }
+}
+```
+
+## Q46. What are container queries?
+
+**Answer:**
+
+Container queries style an element based on its container's size, not the viewport. This enables truly reusable components.
+
+```css
+.card-wrapper {
   container-type: inline-size;
-  container-name: card;
 }
-@container card (min-width: 400px) {
-  .card { display: grid; grid-template-columns: 200px 1fr; }
+
+@container (min-width: 400px) {
+  .card { display: grid; grid-template-columns: 1fr 2fr; }
 }
 ```
 
-A card placed in a sidebar (narrow) and main content (wide) renders differently based on its container. Solves the longstanding problem that components couldn't be truly responsive without knowing layout context.
-
-Container query units: `cqw`, `cqh`, `cqi`, `cqb`, `cqmin`, `cqmax`.
-
----
-
-### Q47. What's the difference between `vw/vh`, `svh/lvh/dvh`?
+## Q47. Difference between `vw/vh`, `svh/lvh/dvh`?
 
 **Answer:**
 
-- `vh`: 1% of viewport height. On mobile, often based on the largest possible viewport (excluding URL bar collapse), causing layouts to clip.
-- `svh`: small viewport height — assumes UI chrome is shown
-- `lvh`: large viewport height — assumes UI chrome is hidden
-- `dvh`: dynamic viewport height — updates as chrome shows/hides
+- `vh` — 1% of the viewport height (legacy, may include or exclude mobile UI).
+- `svh` — small viewport height (UI bars visible).
+- `lvh` — large viewport height (UI bars hidden).
+- `dvh` — dynamic viewport height (changes as bars appear/disappear).
 
-For full-screen mobile sections, prefer `100dvh` (with `100vh` fallback).
+Use `dvh` for full-screen mobile sections.
 
----
+```css
+.hero { min-height: 100dvh; }
+```
 
-### Q48. How do you build responsive images?
+## Q48. How do you build responsive images?
 
 **Answer:**
+
+Use `srcset` for resolution and `sizes` to declare layout width. `<picture>` lets you swap formats or art-direct.
 
 ```html
-<!-- different sizes -->
 <img
-  srcset="img-400.jpg 400w, img-800.jpg 800w, img-1600.jpg 1600w"
-  sizes="(max-width: 600px) 100vw, 50vw"
-  src="img-800.jpg"
-  alt="...">
+  src="photo-800.jpg"
+  srcset="photo-400.jpg 400w, photo-800.jpg 800w, photo-1600.jpg 1600w"
+  sizes="(max-width: 600px) 100vw, 800px"
+  alt="Photo"
+/>
 
-<!-- different formats / art direction -->
 <picture>
-  <source type="image/avif" srcset="hero.avif">
-  <source type="image/webp" srcset="hero.webp">
-  <img src="hero.jpg" alt="...">
+  <source type="image/avif" srcset="photo.avif" />
+  <source type="image/webp" srcset="photo.webp" />
+  <img src="photo.jpg" alt="Photo" />
 </picture>
 ```
 
-Always include `width`/`height` attributes to reserve space and prevent layout shift.
-
 ---
 
-## Selectors, Specificity, Cascade
+## 9. Selectors, Specificity, Cascade
 
-### Q49. What are CSS combinators?
+## Q49. What are CSS combinators?
 
 **Answer:**
 
-| Combinator | Selects |
-|-----------|---------|
-| `A B` (descendant) | Any B inside A |
-| `A > B` (child) | B that is a direct child of A |
-| `A + B` (adjacent sibling) | B immediately following A |
-| `A ~ B` (general sibling) | Any B following A with same parent |
-
----
-
-### Q50. Explain attribute selectors.
-
-**Answer:**
+| Combinator | Meaning |
+| --- | --- |
+| `A B` | Descendant |
+| `A > B` | Direct child |
+| `A + B` | Adjacent sibling |
+| `A ~ B` | Subsequent sibling |
 
 ```css
-[type="email"]       /* exact match */
-[href^="https://"]   /* starts with */
-[href$=".pdf"]       /* ends with */
-[class*="btn-"]      /* contains substring */
-[lang|="en"]         /* equals or starts with `en-` */
-[title~="hello"]     /* contains word */
-[type="text" i]      /* case-insensitive */
+nav a { color: blue; }
+nav > a { font-weight: bold; }
+h2 + p { margin-top: 0; }
+.label ~ input { width: 100%; }
 ```
 
-Useful for state-based styling without classes (`[aria-expanded="true"]`).
-
----
-
-### Q51. What do `:is()`, `:where()`, `:not()`, and `:has()` do?
+## Q50. Explain attribute selectors.
 
 **Answer:**
 
 ```css
-:is(h1, h2, h3) a { color: red; }      /* matches any heading; specificity = highest in list */
-:where(h1, h2, h3) a { color: red; }   /* same matching, specificity = 0 (low) */
+[type="email"] { ... }       /* exact match */
+[href^="https"] { ... }      /* starts with */
+[href$=".pdf"] { ... }       /* ends with */
+[class*="btn"] { ... }       /* contains substring */
+[lang|="en"] { ... }         /* matches "en" or "en-US" */
+```
+
+## Q51. What do `:is()`, `:where()`, `:not()`, and `:has()` do?
+
+**Answer:**
+
+- `:is(.a, .b, .c)` — matches any of the listed selectors. Specificity is the highest of the list.
+- `:where(...)` — same as `:is`, but specificity is always 0.
+- `:not(.x)` — matches elements that don't match the inner selector.
+- `:has(> img)` — parent that has a matching child.
+
+```css
+:is(h1, h2, h3) { font-family: serif; }
+:where(p, li) { line-height: 1.5; } /* low specificity */
 input:not([type="hidden"]) { ... }
-.card:has(img) { ... }                  /* parent selector — card containing an img */
-form:has(input:invalid) { border: 1px solid red; }
+.card:has(img) { padding: 0; }
 ```
 
-`:has()` is the long-awaited "parent selector". Universally supported as of 2024.
-
-`:where()` is great for resets/defaults to avoid specificity wars.
-
----
-
-### Q52. How is specificity calculated?
+## Q52. How is specificity calculated?
 
 **Answer:**
-Three components (a, b, c):
-- **a**: number of ID selectors
-- **b**: number of class, attribute, pseudo-class selectors
-- **c**: number of element and pseudo-element selectors
 
-Compare left-to-right; first non-tie wins.
+Score per selector: inline > IDs > classes/attrs/pseudo-classes > elements.
 
 ```
-#nav .item a:hover    -> 1, 2, 1
-ul li a               -> 0, 0, 3
-.btn.btn-primary      -> 0, 2, 0
+#main .btn:hover  →  (0, 1, 2, 1)  →  121
+.btn.primary       →  (0, 0, 2, 0)  →  20
+button             →  (0, 0, 0, 1)  →  1
 ```
 
-Inline styles add (1,0,0,0). `!important` overrides specificity entirely; use sparingly. `:where()` contributes 0; `:is()`/`:not()`/`:has()` contribute the highest specificity inside.
+`!important` beats normal rules but is best avoided.
 
----
-
-### Q53. What is `@layer` (cascade layers)?
+## Q53. What is `@layer` (cascade layers)?
 
 **Answer:**
-Cascade layers let you order groups of styles independent of source order or specificity:
+
+Cascade layers let you group rules into named layers. Rules in later layers always beat earlier ones, regardless of specificity.
 
 ```css
 @layer reset, base, components, utilities;
 
-@layer reset { * { margin: 0; } }
-@layer components { .btn { padding: 1rem; } }
-@layer utilities { .p-0 { padding: 0; } }
+@layer base {
+  button { padding: 0.5rem 1rem; }
+}
+
+@layer components {
+  .btn-primary { background: blue; } /* always wins over base */
+}
 ```
-
-Later layers win over earlier ones, regardless of specificity. Unlayered styles win over all layered styles.
-
-Solves the "third-party CSS keeps overriding mine" problem without `!important` wars.
 
 ---
 
-## Modern CSS
+## 10. Modern CSS
 
-### Q54. What are scroll-driven animations?
+## Q54. What are scroll-driven animations?
 
 **Answer:**
-CSS animations driven by scroll position, no JS needed:
+
+Animations driven by scroll position rather than time. Useful for reveal effects without JS.
 
 ```css
 @keyframes fade-in {
@@ -1014,139 +935,111 @@ CSS animations driven by scroll position, no JS needed:
   to { opacity: 1; }
 }
 
-.reveal {
+.section {
   animation: fade-in linear;
   animation-timeline: view();
   animation-range: entry 0% cover 30%;
 }
 ```
 
-`view()` triggers when the element enters the viewport; `scroll()` follows scroll progress of an ancestor. Replaces IntersectionObserver-based reveal patterns. Limited browser support — provide fallback.
-
----
-
-### Q55. What is the View Transitions API?
+## Q55. What is the View Transitions API?
 
 **Answer:**
-Native API for animating between DOM states or pages.
+
+It animates between two DOM states with a single API call.
 
 ```js
 document.startViewTransition(() => {
-  // mutate DOM
-  list.append(newItem);
+  document.body.classList.toggle('dark');
 });
 ```
 
 ```css
-::view-transition-old(root), ::view-transition-new(root) {
-  animation-duration: 300ms;
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
 }
 ```
 
-For multi-page (MPA) transitions:
-```css
-@view-transition { navigation: auto; }
-```
-
-Used heavily in Astro, Next.js for SPA-like page transitions without a SPA.
-
----
-
-### Q56. What do `aspect-ratio`, `gap`, and `inset` do?
+## Q56. What do `aspect-ratio`, `gap`, and `inset` do?
 
 **Answer:**
 
-```css
-.thumb { aspect-ratio: 16 / 9; width: 100%; }     /* maintains ratio */
-.grid { display: grid; gap: 1rem; }               /* row + column gap */
-.modal { position: fixed; inset: 0; }             /* shorthand for top/right/bottom/left */
-.modal { position: fixed; inset: 1rem 2rem; }     /* vertical horizontal */
-```
-
-`gap` works in flex too (modern browsers), replacing margin-based spacing.
-
----
-
-### Q57. What are logical properties?
-
-**Answer:**
-Direction-aware properties for internationalization:
+- `aspect-ratio` reserves space at a given ratio.
+- `gap` sets spacing between flex/grid items.
+- `inset` is shorthand for `top right bottom left`.
 
 ```css
-margin-inline-start: 1rem;  /* left in LTR, right in RTL */
-margin-inline: 1rem;        /* left + right */
-margin-block: 1rem;         /* top + bottom */
-padding-inline-end: 1rem;
-border-block-end: 1px solid;
-inset-inline-start: 0;
+.video { aspect-ratio: 16 / 9; }
+.grid { gap: 1rem 2rem; }
+.modal { position: fixed; inset: 0; }
 ```
 
-Critical for sites supporting both LTR (English) and RTL (Arabic, Hebrew) — write once, layout flips automatically.
-
----
-
-## Animations and Effects
-
-### Q58. What's the difference between transitions and animations?
+## Q57. What are logical properties?
 
 **Answer:**
 
-| Transition | Animation |
-|-----------|-----------|
-| State changes (hover, class toggle) | Standalone keyframe sequences |
-| Two states: from current to new | Multiple keyframes possible |
-| No looping or playback control | Iteration count, direction, fill mode, play state |
+Logical properties adapt to writing direction (LTR/RTL/vertical). Use `margin-inline` instead of `margin-left/right`.
 
 ```css
-/* Transition */
-.btn { transition: background 200ms ease; }
-.btn:hover { background: #333; }
+.card {
+  margin-inline: 1rem;   /* left and right in LTR; right and left in RTL */
+  padding-block: 0.5rem; /* top and bottom */
+  border-inline-start: 4px solid blue; /* left in LTR */
+}
+```
 
-/* Animation */
+---
+
+## 11. Animations and Effects
+
+## Q58. Difference between transitions and animations?
+
+**Answer:**
+
+Transitions interpolate between two states (start → end) when a property changes. Animations are scripted with keyframes and can run continuously.
+
+```css
+.btn {
+  background: blue;
+  transition: background 0.3s;
+}
+.btn:hover { background: navy; }
+
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
+  50%      { transform: scale(1.05); }
 }
-.icon { animation: pulse 1s ease-in-out infinite; }
+.live { animation: pulse 1s infinite; }
 ```
 
----
-
-### Q59. Which CSS properties are cheap to animate?
+## Q59. Which CSS properties are cheap to animate?
 
 **Answer:**
-Only `transform` and `opacity` can be composited on the GPU without triggering layout or paint. Animating `width`, `height`, `top`, `left`, `margin` causes layout recalculation on every frame and tanks performance.
+
+Animate `transform` and `opacity` — they run on the GPU and skip layout/paint. Animating `width`, `top`, or `margin` triggers layout and is slower.
 
 ```css
-/* Bad */
-.move { transition: left 300ms; left: 200px; }
-
 /* Good */
-.move { transition: transform 300ms; transform: translateX(200px); }
+.box { transform: translateX(0); transition: transform 0.3s; }
+.box:hover { transform: translateX(20px); }
+
+/* Avoid */
+.box { left: 0; transition: left 0.3s; }
 ```
 
-Use `will-change: transform` sparingly to hint compositor promotion (overuse hogs memory).
-
----
-
-### Q60. What are CSS filters and blend modes?
+## Q60. What are CSS filters and blend modes?
 
 **Answer:**
 
+`filter` applies effects like blur, grayscale, contrast. `mix-blend-mode` blends an element's pixels with what is behind it.
+
 ```css
-.img { filter: blur(4px) grayscale(50%) brightness(1.1); }
+.thumb { filter: grayscale(1) blur(2px); }
 .overlay { mix-blend-mode: multiply; }
-.bg { background-blend-mode: overlay; }
-.backdrop { backdrop-filter: blur(20px); }
 ```
 
-Filters apply to the element. Blend modes combine the element with what's behind it. `backdrop-filter` blurs/affects the area behind a translucent element (frosted glass effect).
-
-Both create stacking contexts.
-
----
-
-### Q61. How do you respect user motion preferences?
+## Q61. How do you respect user motion preferences?
 
 **Answer:**
 
@@ -1154,219 +1047,343 @@ Both create stacking contexts.
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
   }
 }
 ```
 
-Vestibular disorders cause real harm from unwanted animation. WCAG requires this.
-
 ---
 
-## Architecture and Methodologies
+## 12. Architecture and Methodologies
 
-### Q62. What is BEM?
+## Q62. What is BEM?
 
 **Answer:**
-Block Element Modifier — a naming convention.
+
+BEM (Block, Element, Modifier) is a naming convention for CSS classes that keeps styles flat and predictable.
 
 ```html
 <div class="card card--featured">
   <h2 class="card__title">Title</h2>
-  <button class="card__btn card__btn--primary">Buy</button>
+  <p class="card__body">Body</p>
 </div>
 ```
 
-- `block`: standalone component (`card`)
-- `block__element`: child of block (`card__title`)
-- `block--modifier` or `element--modifier`: variant (`card--featured`)
+```css
+.card { ... }
+.card--featured { border: 2px solid gold; }
+.card__title { ... }
+```
 
-Pros: flat specificity, predictable, no nesting wars. Cons: verbose class names. Often paired with utility classes.
-
----
-
-### Q63. What is OOCSS and ITCSS?
+## Q63. What is OOCSS and ITCSS?
 
 **Answer:**
 
-**OOCSS** (Object-Oriented CSS, Nicole Sullivan):
-- Separate structure from skin (layout vs visual style)
-- Separate container from content (don't tie objects to a place)
+- **OOCSS (Object-Oriented CSS)** — separate structure from skin (`.btn` + `.btn-primary`).
+- **ITCSS (Inverted Triangle CSS)** — organize files in increasing specificity layers: settings → tools → generic → elements → objects → components → utilities.
 
-**ITCSS** (Inverted Triangle CSS, Harry Roberts):
-Layered architecture from generic to specific:
-1. Settings (variables)
-2. Tools (mixins)
-3. Generic (resets)
-4. Elements (bare HTML)
-5. Objects (layout patterns, e.g. `.media`)
-6. Components (UI parts, e.g. `.card`)
-7. Utilities (overrides, e.g. `.mt-1`)
-
-Specificity grows down the triangle. Maps cleanly to `@layer`.
-
----
-
-### Q64. CSS-in-JS vs traditional CSS — trade-offs?
+## Q64. CSS-in-JS vs traditional CSS — trade-offs?
 
 **Answer:**
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| Traditional / SCSS | Cacheable, minimal runtime, designer-friendly | Naming conventions, dead code |
-| CSS Modules | Scoped by build tool, type-safe | Build setup, no theming primitives |
-| Utility-first (Tailwind) | Speed, consistency, no naming | Verbose markup, learning curve |
-| Runtime CSS-in-JS (styled-components, Emotion) | Dynamic styles, JS interop | Runtime cost, larger bundles, RSC issues |
-| Compile-time CSS-in-JS (vanilla-extract, Linaria, Panda) | Type-safe + no runtime | Build complexity |
+CSS-in-JS (styled-components, Emotion):
+- Scoped styles automatically.
+- Dynamic styles based on props.
+- Runtime cost; can hurt performance.
+- Issues with React Server Components.
 
-Modern trend favors zero-runtime: Tailwind, vanilla-extract, Panda, or CSS Modules. React Server Components especially penalize runtime CSS-in-JS.
+Traditional CSS / CSS Modules:
+- Better performance, no runtime.
+- Static, more predictable.
+- Need a naming convention to avoid collisions.
 
----
-
-### Q65. What is critical CSS?
+## Q65. What is critical CSS?
 
 **Answer:**
-The minimal subset of CSS needed to render above-the-fold content. Inlined into `<head>` so the first render isn't blocked on the full stylesheet.
+
+Critical CSS is the minimum CSS needed to render above-the-fold content. Inlining it in `<head>` makes the page paint faster; the rest is loaded asynchronously.
 
 ```html
 <head>
-  <style>/* critical CSS */</style>
-  <link rel="preload" href="full.css" as="style" onload="this.rel='stylesheet'">
+  <style>/* critical above-the-fold styles */</style>
+  <link rel="preload" href="full.css" as="style" onload="this.rel='stylesheet'" />
 </head>
 ```
 
-Tools: `critters`, `critical`, frameworks like Next.js handle this automatically. Improves Largest Contentful Paint.
-
 ---
 
-## Performance
+## 13. Performance
 
-### Q66. What are paint, layout, and composite?
-
-**Answer:**
-Rendering pipeline:
-1. **Style**: compute styles
-2. **Layout (reflow)**: compute geometry (width, position)
-3. **Paint**: fill pixels (color, text, shadows)
-4. **Composite**: combine layers on GPU
-
-Property changes trigger different stages:
-- `width`, `height`, `top` -> layout -> paint -> composite (expensive)
-- `color`, `background` -> paint -> composite (medium)
-- `transform`, `opacity` -> composite only (cheap)
-
-Aim for composite-only animations. Reference: csstriggers.com.
-
----
-
-### Q67. What is `contain` and `content-visibility`?
+## Q66. What are paint, layout, and composite?
 
 **Answer:**
+
+The browser rendering pipeline:
+
+1. **Layout** — calculate positions and sizes (changes to `width`, `top`).
+2. **Paint** — fill in pixels (changes to `color`, `background`).
+3. **Composite** — combine layers on the GPU (changes to `transform`, `opacity`).
+
+Animating composite-only properties is fastest.
+
+## Q67. What is `contain` and `content-visibility`?
+
+**Answer:**
+
+`contain` tells the browser an element's internals do not affect the outside, allowing layout/paint optimizations.
+
+`content-visibility: auto` skips rendering off-screen elements until needed.
 
 ```css
-.widget { contain: layout paint; }
-.section { content-visibility: auto; contain-intrinsic-size: 0 500px; }
-```
+.card {
+  contain: layout paint;
+}
 
-- `contain` tells the browser an element's effects don't escape — enables optimizations.
-- `content-visibility: auto` skips rendering off-screen content entirely until near viewport.
-
-Major perf win for long pages with many independent sections.
-
----
-
-### Q68. How do you reduce layout shift (CLS)?
-
-**Answer:**
-- Always set explicit `width`/`height` (or `aspect-ratio`) on images, videos, iframes
-- Reserve space for ads, embeds with placeholders
-- Use `font-display: optional` or self-host with `size-adjust` to prevent FOUT shift
-- Don't insert content above existing content (notifications, banners)
-- Use `transform` for animations instead of properties that cause layout
-
----
-
-### Q69. How do you optimize CSS for production?
-
-**Answer:**
-- **Minify** (cssnano, lightningcss)
-- **Tree-shake unused CSS** (PurgeCSS, Tailwind JIT, Lightning CSS)
-- **Split** non-critical CSS, load async
-- **Inline** critical CSS
-- **HTTP/2 + caching** for shared stylesheets
-- **Avoid `@import` in CSS** (serial requests)
-- **Use system fonts or self-hosted webfonts** with `font-display`
-- **Compress** with Brotli/gzip
-- **Audit** with Lighthouse, Coverage tab in DevTools
-
----
-
-### Q70. How do you handle dark mode?
-
-**Answer:**
-Two strategies:
-
-**System preference only:**
-```css
-:root { --bg: white; --text: black; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #111; --text: #eee; }
+.section {
+  content-visibility: auto;
+  contain-intrinsic-size: 500px;
 }
 ```
 
-**User toggle (preferred for control):**
-```css
-:root { --bg: white; --text: black; }
-[data-theme="dark"] { --bg: #111; --text: #eee; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #111; --text: #eee; }
-}
-```
-
-Persist choice in `localStorage`, apply class/attribute before first paint to avoid flash.
-
-Use `color-scheme` to opt into native dark UI (form controls, scrollbars):
-```css
-:root { color-scheme: light dark; }
-```
-
----
-
-### Q71. What's the difference between `visibility: hidden`, `display: none`, and `opacity: 0`?
+## Q68. How do you reduce layout shift (CLS)?
 
 **Answer:**
 
-| Property | Visible | Takes space | Focusable / clickable | Animatable |
-|----------|---------|-------------|-----------------------|------------|
-| `display: none` | No | No | No | No |
-| `visibility: hidden` | No | Yes | No | No (but new `display` transitions help) |
-| `opacity: 0` | No | Yes | Yes (dangerous!) | Yes |
+- Always set `width` and `height` on images and videos.
+- Reserve space for ads and embeds.
+- Avoid inserting content above existing content.
+- Use `font-display: optional` or preloaded fonts.
 
-For accessible hide-but-reachable links, use a "visually hidden" pattern:
+```html
+<img src="hero.jpg" width="1600" height="900" alt="" />
+```
+
+## Q69. How do you optimize CSS for production?
+
+**Answer:**
+
+- Minify and gzip/brotli.
+- Remove unused CSS (PurgeCSS, Tailwind's JIT).
+- Inline critical CSS.
+- Split large files per route.
+- Use `@layer` to avoid specificity arms races.
+
+## Q70. How do you handle dark mode?
+
+**Answer:**
+
+Use CSS variables and a `[data-theme]` attribute or `prefers-color-scheme`.
 
 ```css
-.sr-only {
+:root {
+  --bg: white;
+  --fg: black;
+}
+[data-theme="dark"], 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d0d0d;
+    --fg: #f5f5f5;
+  }
+}
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+```
+
+```js
+document.documentElement.dataset.theme = 'dark';
+```
+
+## Q71. Difference between `visibility: hidden`, `display: none`, and `opacity: 0`?
+
+**Answer:**
+
+| | Takes space | Receives clicks | Accessible |
+| --- | --- | --- | --- |
+| `display: none` | No | No | No |
+| `visibility: hidden` | Yes | No | No |
+| `opacity: 0` | Yes | Yes | Yes |
+
+```css
+.tooltip { opacity: 0; transition: opacity 0.2s; }
+.tooltip.show { opacity: 1; }
+```
+
+## Q72. How do you debug CSS specificity issues?
+
+**Answer:**
+
+- Inspect the element in DevTools and check the "Computed" tab.
+- Look at which rule wins; click to see the file/line.
+- If specificity is the issue, raise the winning selector or rewrite using `@layer`.
+- Avoid `!important` — fix the root cause.
+
+## Q73. How do you make a CSS-only dropdown menu?
+
+**Answer:**
+
+Use `:hover` and `:focus-within` with a relatively positioned wrapper.
+
+```html
+<nav>
+  <details class="menu">
+    <summary>Menu</summary>
+    <ul>
+      <li><a href="/a">A</a></li>
+      <li><a href="/b">B</a></li>
+    </ul>
+  </details>
+</nav>
+```
+
+```css
+.menu ul {
   position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden;
-  clip: rect(0,0,0,0);
+  display: none;
+}
+.menu[open] ul { display: block; }
+```
+
+## Q74. How do you make a sticky footer with CSS Grid?
+
+**Answer:**
+
+```css
+body {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+```
+
+```html
+<body>
+  <header>...</header>
+  <main>...</main>
+  <footer>...</footer>
+</body>
+```
+
+## Q75. What is the difference between `<a>` and `<button>`?
+
+**Answer:**
+
+`<a>` navigates to a URL. `<button>` triggers an action on the current page. Using a button-styled link or link-styled button is fine, but the underlying element should match its purpose for accessibility.
+
+```html
+<a href="/about">About</a>          <!-- navigation -->
+<button onclick="open()">Open</button> <!-- action -->
+```
+
+## Q76. How do you create custom checkboxes and radios?
+
+**Answer:**
+
+Hide the native input visually but keep it accessible, then style a sibling.
+
+```html
+<label class="check">
+  <input type="checkbox" />
+  <span></span>
+  Accept terms
+</label>
+```
+
+```css
+.check input { position: absolute; opacity: 0; }
+.check span {
+  width: 1rem; height: 1rem; border: 1px solid;
+  display: inline-block;
+}
+.check input:checked + span { background: blue; }
+.check input:focus + span { outline: 2px solid; }
+```
+
+## Q77. How do you make text truncate with ellipsis?
+
+**Answer:**
+
+Single line:
+
+```css
+.truncate {
   white-space: nowrap;
-  border: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+```
+
+Multi-line:
+
+```css
+.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+```
+
+## Q78. What does `pointer-events` do?
+
+**Answer:**
+
+`pointer-events: none` makes an element unable to receive mouse/touch events — clicks pass through to elements below.
+
+```css
+.disabled { pointer-events: none; opacity: 0.5; }
+```
+
+## Q79. What is `scroll-snap`?
+
+**Answer:**
+
+Snaps the scroll position to specific points, useful for carousels.
+
+```css
+.gallery {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.gallery img {
+  scroll-snap-align: start;
+  flex: 0 0 100%;
+}
+```
+
+## Q80. What are CSS counters?
+
+**Answer:**
+
+CSS counters number elements automatically.
+
+```css
+ol.legal {
+  counter-reset: section;
+  list-style: none;
+}
+ol.legal > li {
+  counter-increment: section;
+}
+ol.legal > li::before {
+  content: counters(section, ".") ". ";
 }
 ```
 
 ---
 
-### Q72. How do you debug CSS specificity issues?
+## 14. Quick Reference
 
-**Answer:**
-- DevTools "Computed" tab shows winning declarations and crossed-out losers
-- "Styles" tab shows all matching rules in cascade order
-- Specificity calculator (specificity.keegan.st)
-- Audit with `:where()` to neutralize specificity for resets/utilities
-- Refactor toward flat selectors (BEM, utility classes, cascade layers)
-
-Avoid `!important` except for utility classes designed to override (e.g. accessibility helpers).
+| Concept | Tool |
+| ------- | ---- |
+| Layout | Flexbox + Grid |
+| Spacing | `gap`, `margin-inline`, `padding-block` |
+| Theming | CSS custom properties |
+| Responsiveness | Container queries + media queries |
+| Animation | `transform`, `opacity`, `@keyframes` |
+| Architecture | BEM, ITCSS, `@layer` |
+| Accessibility | Semantic HTML, ARIA when needed |
+| Performance | Critical CSS, `content-visibility`, image dimensions |

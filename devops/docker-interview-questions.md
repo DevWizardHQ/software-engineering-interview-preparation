@@ -1,172 +1,194 @@
 # Docker Interview Questions
 
-**Level:** Mid to Senior
-**Topics:** Containers, Images, Dockerfile, Compose, Networking, Volumes, Security, Production Patterns
+A practical, teaching-style Q&A guide for Docker. Each question gives a plain-language explanation followed by a working command, Dockerfile, or compose example you can run.
 
 ---
 
 ## Table of Contents
 
-1. [Fundamentals](#fundamentals)
-2. [Images and Dockerfile](#images-and-dockerfile)
-3. [Containers and Runtime](#containers-and-runtime)
-4. [Docker Compose](#docker-compose)
-5. [Networking](#networking)
-6. [Volumes and Storage](#volumes-and-storage)
-7. [Security](#security)
-8. [Production Patterns](#production-patterns)
-9. [BuildKit and Advanced Builds](#buildkit-and-advanced-builds)
-10. [Debugging and Troubleshooting](#debugging-and-troubleshooting)
+1. Fundamentals
+2. Images and Dockerfile
+3. Containers and Runtime
+4. Docker Compose
+5. Networking
+6. Volumes and Storage
+7. Security
+8. Production Patterns
+9. BuildKit and Advanced Builds
+10. Debugging and Troubleshooting
 
 ---
 
-## Fundamentals
+## 1. Fundamentals
 
-### Q1. What is Docker?
+## Q1. What is Docker?
 
 **Answer:**
-Docker is a platform for packaging applications and their dependencies into portable, isolated units called containers. It uses Linux kernel features (namespaces, cgroups, union filesystems) to provide process isolation without the overhead of a full virtual machine.
 
----
+Docker is a tool that lets you package an application together with its operating system libraries, runtime, and configuration into a single unit called a container. Once packaged, that container runs the same way on any machine that has Docker installed: your laptop, a CI server, or a production cloud VM.
 
-### Q2. Containers vs Virtual Machines?
+The benefit is consistency. The classic problem of "it works on my machine" is solved because the container carries its own environment with it.
 
-| Aspect | Container | Virtual Machine |
-|--------|-----------|-----------------|
-| OS | Shares host kernel | Full guest OS |
-| Boot time | Seconds (or less) | Minutes |
-| Size | MBs | GBs |
-| Isolation | Process-level (namespaces, cgroups) | Hardware-level (hypervisor) |
-| Performance | Near-native | Slight virtualization overhead |
-| Density | 100s per host | 10s per host |
-| Use case | Microservices, app packaging | OS isolation, legacy workloads |
+```bash
+docker run -d -p 8080:80 --name web nginx:1.27-alpine
+curl http://localhost:8080
+```
 
-Containers share the host kernel, making them lightweight; VMs each run their own kernel.
+This pulls the Nginx image and runs it as a container, mapping port 8080 on your machine to port 80 inside the container.
 
----
-
-### Q3. What is Docker's architecture?
+## Q2. What is the difference between containers and virtual machines?
 
 **Answer:**
-- **Docker Client** — the CLI (`docker`) that sends commands.
-- **Docker Daemon (`dockerd`)** — manages images, containers, networks, volumes.
-- **containerd** — high-level container runtime; pulls images and manages container lifecycle.
-- **runc** — low-level runtime that creates and runs containers per the OCI spec.
-- **Registry** — stores images (Docker Hub, GHCR, ECR, private).
 
-Client → REST API → Daemon → containerd → runc → kernel.
+A virtual machine virtualizes the hardware. Each VM contains a full guest operating system and its own kernel. This makes VMs heavy: gigabytes of disk, slow to boot, and expensive in memory.
 
----
+A container shares the host kernel. It only ships the application and its user-space libraries. This makes containers small (often tens of megabytes), fast to start (seconds or less), and cheap to run hundreds at a time.
 
-### Q4. Image vs container?
+| Aspect       | Virtual Machine        | Container             |
+| ------------ | ---------------------- | --------------------- |
+| Kernel       | Own kernel per VM      | Shares host kernel    |
+| Boot time    | 30–60 seconds          | < 1 second            |
+| Image size   | Gigabytes              | Megabytes             |
+| Isolation    | Strong (hardware-level)| Process-level         |
 
-**Answer:**
-- **Image** — read-only template with the filesystem and metadata. Built from a Dockerfile, made of layers.
-- **Container** — a running (or stopped) instance of an image with a thin writable top layer.
-
-Analogy: image is the class, container is the instance.
-
----
-
-### Q5. What are image layers?
+## Q3. What is Docker's architecture?
 
 **Answer:**
-Each instruction in a Dockerfile produces a layer. Layers are stacked using a union filesystem (overlay2). Layers are:
-- immutable
-- shared between images (saves disk and bandwidth)
-- cached for fast rebuilds
 
-```dockerfile
-FROM node:20-alpine          # base layer
-WORKDIR /app                 # metadata layer (no fs change)
-COPY package*.json ./        # layer with package files
-RUN npm ci                   # layer with node_modules
-COPY . .                     # layer with source code
-CMD ["node", "server.js"]    # metadata only
+Docker has three main pieces. The Docker client is the CLI you type commands into. The Docker daemon (`dockerd`) is a background process that does the real work: building images, running containers, managing networks. The two talk over a Unix socket. Behind the daemon is `containerd`, which manages container lifecycle, and `runc`, which actually creates the Linux namespaces and cgroups that make a container.
+
+```bash
+docker version
+# Client: Docker Engine - Community
+#   Version: 27.x
+# Server: Docker Engine - Community
+#   Version: 27.x
+```
+
+When you type `docker run`, the client sends a request to the daemon, the daemon asks containerd to start the container, and containerd asks runc to set up the kernel isolation.
+
+## Q4. What is the difference between an image and a container?
+
+**Answer:**
+
+An image is a read-only template. It is a stack of filesystem layers plus metadata that says "to run this, execute command X." Think of an image like a class in programming.
+
+A container is a running (or stopped) instance of an image. It adds a writable layer on top so the application can create files. Think of a container like an object created from a class. You can run many containers from the same image.
+
+```bash
+docker pull nginx:1.27-alpine     # downloads the image
+docker run -d nginx:1.27-alpine   # creates and starts a container
+docker run -d nginx:1.27-alpine   # creates a SECOND container from the same image
+docker ps                         # lists running containers
+docker images                     # lists local images
+```
+
+## Q5. What are image layers?
+
+**Answer:**
+
+Every instruction in a Dockerfile (`RUN`, `COPY`, `ADD`) creates a layer. Layers stack on top of each other and are cached. If a layer has not changed, Docker reuses the cache, making subsequent builds fast.
+
+Layers are also shared between images. If two images both build on `node:20-alpine`, the base layers are stored on disk only once.
+
+```bash
+docker history nginx:1.27-alpine
+# IMAGE          CREATED      CREATED BY                       SIZE
+# abc123         2 weeks ago  CMD ["nginx" "-g" "daemon off;"] 0B
+# def456         2 weeks ago  COPY docker-entrypoint.sh /...   1.2kB
+```
+
+## Q6. What is the OCI specification?
+
+**Answer:**
+
+OCI (Open Container Initiative) is an industry standard that defines two things: the image format (how layers and metadata are packaged) and the runtime (how to start a container from an image). Because of OCI, an image built by Docker can be run by Podman, containerd, CRI-O, or Kubernetes without modification.
+
+```bash
+docker buildx imagetools inspect nginx:1.27-alpine
 ```
 
 ---
 
-### Q6. What is the OCI specification?
+## 2. Images and Dockerfile
+
+## Q7. What is a Dockerfile?
 
 **Answer:**
-The Open Container Initiative defines standards for container image format and runtime behavior. Docker images and runtimes are OCI-compliant, so they interop with other tools (Podman, containerd, CRI-O, Kubernetes).
 
----
-
-## Images and Dockerfile
-
-### Q7. What is a Dockerfile?
-
-**Answer:**
-A text file with instructions to build an image.
+A Dockerfile is a text file containing the steps to build an image. Each line is an instruction that Docker executes in order, and most instructions create a new layer.
 
 ```dockerfile
 FROM node:20-alpine
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+COPY package*.json ./
+RUN npm ci --only=production
 COPY . .
 EXPOSE 3000
-USER node
 CMD ["node", "server.js"]
 ```
 
----
+Build and run it:
 
-### Q8. Common Dockerfile instructions?
-
-| Instruction | Purpose |
-|-------------|---------|
-| `FROM` | Base image |
-| `WORKDIR` | Sets working directory |
-| `COPY` / `ADD` | Copy files into image |
-| `RUN` | Execute command at build time |
-| `CMD` | Default container command |
-| `ENTRYPOINT` | Container entrypoint (combined with CMD) |
-| `ENV` | Environment variable |
-| `ARG` | Build-time variable |
-| `EXPOSE` | Document a port |
-| `VOLUME` | Declare a mount point |
-| `USER` | Set runtime user |
-| `HEALTHCHECK` | Container health probe |
-| `LABEL` | Metadata |
-
----
-
-### Q9. CMD vs ENTRYPOINT?
-
-**Answer:**
-- **CMD** — default arguments; can be overridden by `docker run image arg`.
-- **ENTRYPOINT** — the executable; CMD becomes its default arguments.
-
-```dockerfile
-ENTRYPOINT ["node"]
-CMD ["server.js"]
+```bash
+docker build -t myapp:1.0 .
+docker run -d -p 3000:3000 myapp:1.0
 ```
 
-`docker run app` → `node server.js`
-`docker run app worker.js` → `node worker.js`
-
-Best practice: use `ENTRYPOINT` for the binary, `CMD` for default flags. Always use exec form (JSON array) for proper signal handling.
-
----
-
-### Q10. COPY vs ADD?
+## Q8. What are the most common Dockerfile instructions?
 
 **Answer:**
-Both copy files. `ADD` additionally:
-- auto-extracts local tar archives
-- supports remote URLs
 
-Best practice: prefer `COPY`. Use `ADD` only when you need its extra features. URLs should be fetched via `RUN curl` so you can clean up in the same layer.
+| Instruction  | Purpose                                                          |
+| ------------ | ---------------------------------------------------------------- |
+| `FROM`       | Base image to start from                                         |
+| `WORKDIR`    | Sets the working directory inside the image                      |
+| `COPY`       | Copies files from build context into the image                   |
+| `RUN`        | Runs a command at build time and saves the result as a new layer |
+| `ENV`        | Sets an environment variable                                     |
+| `ARG`        | Build-time variable                                              |
+| `EXPOSE`     | Documents which port the app listens on                          |
+| `CMD`        | Default command run when the container starts                    |
+| `ENTRYPOINT` | Fixed entry executable; arguments come from CMD or `docker run`  |
+| `USER`       | Switch to a non-root user                                        |
+| `HEALTHCHECK`| Defines how Docker checks if the container is healthy            |
 
----
-
-### Q11. What is a multi-stage build?
+## Q9. What is the difference between CMD and ENTRYPOINT?
 
 **Answer:**
-Multiple `FROM` statements in a single Dockerfile. Each stage is independent; you copy only the needed artifacts to the final stage. Result: small, secure production images.
+
+`ENTRYPOINT` defines the executable that always runs. `CMD` provides default arguments to that executable, and those arguments can be overridden on the command line.
+
+```dockerfile
+ENTRYPOINT ["python", "app.py"]
+CMD ["--port", "8000"]
+```
+
+```bash
+docker run myapp                  # runs: python app.py --port 8000
+docker run myapp --port 9000      # runs: python app.py --port 9000
+```
+
+If you only use `CMD` with no `ENTRYPOINT`, the entire CMD can be replaced at runtime.
+
+## Q10. What is the difference between COPY and ADD?
+
+**Answer:**
+
+`COPY` copies local files into the image. It is simple and predictable.
+
+`ADD` does the same, but with two extra behaviors: it can fetch from a URL, and it auto-extracts local tar files. These extras are mostly footguns. Use `COPY` unless you specifically need ADD's auto-extract.
+
+```dockerfile
+COPY ./src /app/src                        # preferred
+ADD https://example.com/file.tar.gz /tmp/  # rarely needed; prefer RUN curl
+```
+
+## Q11. What is a multi-stage build?
+
+**Answer:**
+
+A multi-stage build uses several `FROM` statements in one Dockerfile. You build the application in one stage (which can be heavy because it has compilers, dev dependencies, etc.) and copy only the final artifacts into a small runtime stage. This keeps your final image small and free of build tools.
 
 ```dockerfile
 # Stage 1: build
@@ -178,770 +200,878 @@ COPY . .
 RUN npm run build
 
 # Stage 2: runtime
-FROM node:20-alpine
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
-COPY --from=builder /app/dist ./dist
-USER node
-CMD ["node", "dist/server.js"]
+FROM nginx:1.27-alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
----
+The final image only contains Nginx and the built static files, not Node or `node_modules`.
 
-### Q12. How does layer caching work?
+## Q12. How does layer caching work?
 
 **Answer:**
-Docker checks each instruction against its cache key (instruction text + parent layer + file content for COPY/ADD). On a hit, it reuses the cached layer. On a miss, that step and all subsequent steps re-run.
 
-**Optimization:** put rarely changing instructions first.
+Docker hashes each instruction along with its inputs (files copied, command run). If the hash matches a previous build, the cached layer is reused. The cache is checked in order, so the moment a layer changes, all layers below it are rebuilt.
+
+The practical lesson: put rarely-changing things first.
 
 ```dockerfile
-# Good: deps cached when only source changes
+# GOOD: dependencies cached when only source changes
+FROM node:20-alpine
+WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
 
-# Bad: any source change reinstalls deps
+# BAD: any source change reinstalls dependencies
+FROM node:20-alpine
+WORKDIR /app
 COPY . .
 RUN npm ci
 ```
 
----
-
-### Q13. What is `.dockerignore`?
+## Q13. What is `.dockerignore`?
 
 **Answer:**
-Excludes files from the build context sent to the daemon. Reduces build time, image size, and prevents secret leakage.
 
-```
+`.dockerignore` works like `.gitignore`. It tells Docker which files to skip when sending the build context to the daemon. This makes builds faster and avoids leaking secrets into the image.
+
+```text
 node_modules
 .git
 .env
-.env.local
 *.log
 dist
-coverage
-.vscode
 .DS_Store
-Dockerfile
-docker-compose*.yml
 ```
 
----
+Without it, your entire `node_modules` and `.git` folder get uploaded to the daemon every build.
 
-### Q14. Alpine vs slim vs distroless?
-
-| Image | Size | Tools | Use case |
-|-------|------|-------|----------|
-| `node:20` | ~1 GB | Full Debian | Development |
-| `node:20-slim` | ~250 MB | Minimal Debian | Production with shell access |
-| `node:20-alpine` | ~150 MB | musl libc, busybox | Smallest with shell |
-| `gcr.io/distroless/nodejs20` | ~120 MB | No shell, no package manager | Production hardened |
-
-**Trade-offs:**
-- Alpine uses musl libc (some packages with native bindings break).
-- Distroless has no shell, making `docker exec` impossible — debug via `:debug` variants.
-- Slim is a safe default when alpine causes issues.
-
----
-
-### Q15. Best practices for small images?
+## Q14. Alpine vs slim vs distroless — how do I choose a base image?
 
 **Answer:**
-1. Use minimal base images (alpine, slim, distroless).
-2. Multi-stage builds — drop build tools.
-3. Combine `RUN` commands to reduce layers; clean up in the same layer:
-   ```dockerfile
-   RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-   ```
-4. Use `.dockerignore`.
-5. Order instructions for cache (rarely-changing first).
-6. Don't install dev/test dependencies in production stage.
-7. Avoid `apt-get upgrade`; use a fresh base image.
 
----
+| Base       | Size    | Pros                                    | Cons                                |
+| ---------- | ------- | --------------------------------------- | ----------------------------------- |
+| `ubuntu`   | ~70 MB  | Familiar, full package manager          | Largest                             |
+| `*-slim`   | ~30 MB  | Smaller, still uses glibc               | Fewer tools available               |
+| `alpine`   | ~5 MB   | Very small                              | Uses musl libc; some packages break |
+| distroless | ~2 MB   | No shell, very few CVEs, secure         | Hard to debug (no shell)            |
 
-### Q16. Why is `latest` tag dangerous?
+A reasonable default for Node, Python, or Go is the `*-slim` or `*-alpine` image of the official language base. For production hardening, use distroless.
 
-**Answer:**
-- Not immutable — points to a moving target.
-- Builds aren't reproducible.
-- Rollback is unclear.
-- Image pulls may produce a different image on different days.
-
-Use specific tags or digests:
 ```dockerfile
-FROM node:20.11.1-alpine3.19
-# or
-FROM node@sha256:abc123...
+FROM gcr.io/distroless/nodejs20-debian12
+COPY --from=builder /app /app
+WORKDIR /app
+CMD ["server.js"]
 ```
 
----
-
-### Q17. What is a `HEALTHCHECK`?
+## Q15. What are best practices for keeping images small?
 
 **Answer:**
-A periodic command Docker runs to determine container health. Reflected in `docker ps` STATUS and used by orchestrators.
+
+1. Use a small base (alpine, slim, or distroless).
+2. Use multi-stage builds so build tools never end up in the final image.
+3. Combine `RUN` commands and clean up package caches in the same layer.
+4. Add a `.dockerignore`.
+5. Avoid copying unneeded files like tests, docs, or development configs.
+
+```dockerfile
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+```
+
+## Q16. Why is the `latest` tag dangerous?
+
+**Answer:**
+
+`latest` is just a tag; it does not mean "newest." It points to whatever the publisher last tagged as `latest`, which can change at any moment. If you deploy with `latest` today and again next week, you may get two completely different images. This breaks reproducibility and can suddenly introduce breaking changes.
+
+Always pin to a specific version, or even better, a digest.
+
+```dockerfile
+# Bad
+FROM node:latest
+
+# Good
+FROM node:20.11.0-alpine
+
+# Best (immutable)
+FROM node:20.11.0-alpine@sha256:abc123...
+```
+
+## Q17. What is `HEALTHCHECK`?
+
+**Answer:**
+
+`HEALTHCHECK` tells Docker how to verify the container is actually working, not just running. Docker periodically runs the check command. If it fails enough times, the container is marked unhealthy, which orchestrators can use to restart or stop sending traffic.
 
 ```dockerfile
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD curl -fsS http://localhost:3000/health || exit 1
+  CMD curl -f http://localhost:3000/health || exit 1
 ```
 
-Exit 0 = healthy, 1 = unhealthy.
+Check status:
 
----
+```bash
+docker ps
+# STATUS: Up 2 minutes (healthy)
+```
 
-### Q18. ARG vs ENV?
+## Q18. What is the difference between ARG and ENV?
 
 **Answer:**
 
-| | ARG | ENV |
-|---|---|---|
-| Scope | Build time only | Build and runtime |
-| Override | `--build-arg` | `-e` or compose `environment` |
-| In running container | No | Yes |
+`ARG` is a build-time variable. It exists only while the image is being built and is not present at runtime.
+
+`ENV` is a runtime environment variable. It is baked into the image and visible to processes inside the container.
 
 ```dockerfile
 ARG NODE_VERSION=20
 FROM node:${NODE_VERSION}-alpine
+
+ENV APP_ENV=production
 ENV PORT=3000
 ```
 
-Never put secrets in ARG/ENV — they leak into image history and `docker inspect`.
-
----
-
-## Containers and Runtime
-
-### Q19. Common Docker commands?
+Pass an ARG at build time:
 
 ```bash
-docker run -d --name api -p 3000:3000 myimage:tag   # run detached
-docker ps                                             # running containers
-docker ps -a                                          # all containers
-docker logs -f api                                    # follow logs
-docker exec -it api sh                                # shell into running container
-docker inspect api                                    # full metadata
-docker stats                                          # live resource usage
-docker stop api && docker rm api                      # stop and remove
-docker image ls                                       # list images
-docker image prune -a                                 # remove unused images
-docker system df                                      # disk usage
-docker system prune -af --volumes                     # nuke everything unused
+docker build --build-arg NODE_VERSION=18 -t myapp .
+```
+
+Override an ENV at runtime:
+
+```bash
+docker run -e APP_ENV=staging myapp
 ```
 
 ---
 
-### Q20. What is a restart policy?
+## 3. Containers and Runtime
+
+## Q19. What are the most common Docker commands?
 
 **Answer:**
-Tells Docker when to restart a container.
-
-| Policy | Behavior |
-|--------|----------|
-| `no` | Never restart (default) |
-| `on-failure[:N]` | Restart on non-zero exit, optional max retries |
-| `always` | Always restart, even after daemon restart |
-| `unless-stopped` | Like always, but respects manual `docker stop` |
 
 ```bash
-docker run --restart unless-stopped myapp
+docker ps                       # list running containers
+docker ps -a                    # include stopped
+docker images                   # list local images
+docker run -d --name web nginx  # run detached with a name
+docker exec -it web sh          # open a shell in a running container
+docker logs -f web              # tail logs
+docker stop web                 # graceful stop (SIGTERM, then SIGKILL)
+docker rm web                   # remove a stopped container
+docker rmi nginx                # remove an image
+docker system df                # show disk usage by Docker
+docker system prune             # delete unused data (careful)
 ```
 
-For production: `unless-stopped` or use an orchestrator.
-
----
-
-### Q21. How do containers handle signals?
+## Q20. What is a restart policy?
 
 **Answer:**
-PID 1 in the container receives signals. `docker stop` sends SIGTERM (10s grace by default), then SIGKILL.
 
-**Pitfall:** shell-form CMD (`CMD node server.js`) wraps in `/bin/sh -c`, which doesn't forward signals. Use exec form (`CMD ["node", "server.js"]`).
+A restart policy tells Docker what to do when the container exits.
 
-For Node, ensure graceful shutdown:
-```js
-process.on('SIGTERM', () => server.close(() => process.exit(0)));
-```
-
-Use `tini` or `--init` for proper PID 1 behavior (zombie reaping):
-```bash
-docker run --init myapp
-```
-
----
-
-### Q22. How to limit container resources?
+| Policy            | Behavior                                                  |
+| ----------------- | --------------------------------------------------------- |
+| `no` (default)    | Never restart                                             |
+| `on-failure`      | Restart only if the exit code is non-zero                 |
+| `always`          | Always restart, even if you stop it manually              |
+| `unless-stopped`  | Restart unless explicitly stopped (good default for prod) |
 
 ```bash
-docker run \
-  --cpus=1.5 \
+docker run -d --restart unless-stopped --name web nginx
+```
+
+## Q21. How do containers handle signals?
+
+**Answer:**
+
+When you run `docker stop`, Docker sends `SIGTERM` to PID 1 inside the container. After a grace period (10 seconds by default), it sends `SIGKILL`. Your application should listen for SIGTERM and shut down cleanly: finish in-flight requests, close database connections, then exit.
+
+A common bug: if you start your app with `CMD npm start`, the shell becomes PID 1 and may not forward signals. Use the exec form:
+
+```dockerfile
+# Bad: shell wraps and may swallow signals
+CMD npm start
+
+# Good: node is PID 1 and receives SIGTERM directly
+CMD ["node", "server.js"]
+```
+
+If you must use a shell, add `tini` as init: `--init` flag or `ENTRYPOINT ["/sbin/tini", "--"]`.
+
+## Q22. How do you limit container resources?
+
+**Answer:**
+
+By default a container can use as much CPU and memory as the host has. Use flags to cap it.
+
+```bash
+docker run -d \
   --memory=512m \
   --memory-swap=512m \
+  --cpus=1.5 \
   --pids-limit=200 \
   myapp
 ```
 
-Backed by Linux cgroups. Always set limits in production to prevent noisy-neighbor issues.
+`--memory` is a hard cap; the kernel kills the container if it exceeds it. `--cpus=1.5` means at most 1.5 CPU cores worth of compute.
+
+## Q23. What is the difference between `docker run` and `docker create`?
+
+**Answer:**
+
+`docker create` makes a container but does not start it. `docker run` is `docker create` followed by `docker start`. Use `create` when you want to prepare a container, configure it, then start it later.
+
+```bash
+docker create --name web nginx
+docker start web
+```
 
 ---
 
-### Q23. Difference between `docker run` and `docker create`?
+## 4. Docker Compose
+
+## Q24. What is Docker Compose?
 
 **Answer:**
-- `docker create` — creates the container without starting.
-- `docker start` — starts an existing container.
-- `docker run` = `create` + `start`.
 
----
-
-## Docker Compose
-
-### Q24. What is Docker Compose?
-
-**Answer:**
-A tool for defining and running multi-container applications via a YAML file. Manages networks, volumes, build, dependencies, and environment as a single unit.
+Docker Compose lets you describe a multi-container application in a single YAML file and start everything with one command. It is ideal for local development, integration testing, and small single-host deployments.
 
 ```yaml
+# docker-compose.yml
 services:
-  api:
-    build: .
+  web:
+    image: nginx:1.27-alpine
     ports:
-      - "3000:3000"
+      - "8080:80"
+  api:
+    build: ./api
     environment:
-      DATABASE_URL: postgres://app:secret@db:5432/app
+      DATABASE_URL: postgres://postgres:secret@db:5432/app
     depends_on:
-      db:
-        condition: service_healthy
+      - db
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: app
       POSTGRES_PASSWORD: secret
-      POSTGRES_DB: app
     volumes:
       - dbdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app"]
-      interval: 5s
-      retries: 10
+
 volumes:
   dbdata:
 ```
 
----
-
-### Q25. Compose `depends_on` — does it wait for the service to be ready?
-
-**Answer:**
-Plain `depends_on` only waits for the container to start, not for the application inside to be ready. Use `condition: service_healthy` with a healthcheck for true readiness, or implement retry logic in your app.
-
----
-
-### Q26. How do services communicate in Compose?
-
-**Answer:**
-Compose creates a default bridge network. Services reach each other by service name as DNS:
-```
-postgres://db:5432
-http://api:3000
+```bash
+docker compose up -d
+docker compose logs -f api
+docker compose down
 ```
 
-No need to expose ports between services on the same network — only expose to the host with `ports:` when needed externally.
-
----
-
-### Q27. Profiles and override files?
+## Q25. Does `depends_on` wait for the service to be ready?
 
 **Answer:**
-- **Profiles** — selectively start services (`docker compose --profile dev up`).
-- **Override files** — `docker-compose.override.yml` is auto-merged. Use named overrides for environments:
-  ```bash
-  docker compose -f docker-compose.yml -f docker-compose.prod.yml up
-  ```
 
----
+By default, `depends_on` only waits until the dependency container has *started*, not until it is *ready* to accept connections. A Postgres container can be started but not yet accepting queries.
 
-## Networking
+Use the `condition: service_healthy` form together with a `healthcheck`:
 
-### Q28. Docker network drivers?
+```yaml
+services:
+  api:
+    build: ./api
+    depends_on:
+      db:
+        condition: service_healthy
 
-| Driver | Use case |
-|--------|----------|
-| `bridge` | Default; isolated network on a single host |
-| `host` | Container shares host network namespace; no isolation |
-| `none` | No networking |
-| `overlay` | Multi-host networking (Swarm/Kubernetes) |
-| `macvlan` | Container appears as physical device on LAN |
+  db:
+    image: postgres:16-alpine
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 5
+```
 
----
-
-### Q29. Default bridge vs user-defined bridge?
+## Q26. How do services communicate in Docker Compose?
 
 **Answer:**
-- **Default bridge** (`docker0`) — containers reach each other only by IP; legacy.
-- **User-defined bridge** — automatic DNS resolution by container name; better isolation. Always create one for multi-container apps.
+
+Compose creates a default network and registers each service by name. Inside any container, you can reach another service using its service name as the hostname.
+
+```yaml
+services:
+  api:
+    environment:
+      DATABASE_URL: postgres://postgres@db:5432/app
+  db:
+    image: postgres:16
+```
+
+From the `api` container, `db` resolves to the database container's IP. There is no need for IP addresses or port mapping for inter-service traffic.
+
+## Q27. What are profiles and override files?
+
+**Answer:**
+
+Profiles let you tag services so they only start when the profile is selected. This is useful for things like a debug container or a load tester you do not always want running.
+
+```yaml
+services:
+  app:
+    image: myapp
+  loadtest:
+    image: locust
+    profiles: ["test"]
+```
+
+```bash
+docker compose up                       # only starts app
+docker compose --profile test up        # starts both
+```
+
+Override files let you layer environment-specific config. Compose automatically merges `docker-compose.override.yml` if it exists.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+---
+
+## 5. Networking
+
+## Q28. What are Docker network drivers?
+
+**Answer:**
+
+| Driver  | When to use                                                            |
+| ------- | ---------------------------------------------------------------------- |
+| bridge  | Default for single-host setups; isolated network per `docker run`      |
+| host    | Container shares host network namespace; no isolation, max performance |
+| none    | No networking                                                          |
+| overlay | Multi-host networking (Swarm/Kubernetes)                               |
+| macvlan | Container appears as a physical device on the LAN                      |
+
+## Q29. What is the difference between the default bridge and a user-defined bridge?
+
+**Answer:**
+
+The default bridge network does not provide DNS-based service discovery. To connect containers, you used to need `--link` (deprecated). A user-defined bridge enables automatic name-based DNS, so containers find each other by name.
 
 ```bash
 docker network create app-net
-docker run --network app-net --name api ...
-docker run --network app-net --name db ...
-# api can reach db at "db:5432"
+docker run -d --name db --network app-net postgres:16
+docker run -d --name api --network app-net myapi
+# Inside api, "db" resolves to the database container.
 ```
 
-Compose creates a user-defined bridge automatically.
+This is what Docker Compose does for you automatically.
 
----
-
-### Q30. Host vs bridge network?
+## Q30. What is the difference between host and bridge network?
 
 **Answer:**
-- **Bridge** — NAT, port mapping required, isolation.
-- **Host** — no isolation, no port mapping, slightly higher performance, conflicts on ports.
 
-Host is useful for high-throughput apps or when you need broadcast/multicast. Avoid on shared hosts.
+With bridge, the container has its own network stack and you publish ports with `-p`. Traffic goes through Docker's NAT.
 
----
-
-### Q31. How does port mapping work?
+With host, the container uses the host's network stack directly. There is no port mapping; the container binds directly to the host's ports. This is faster but breaks isolation and only works on Linux.
 
 ```bash
-docker run -p 8080:80 nginx
-# host:container — host's 8080 forwards to container's 80
-docker run -p 127.0.0.1:8080:80 nginx
-# bind only to localhost
+docker run -d --network host nginx
+# Nginx now listens on the host's port 80 directly.
 ```
 
-Implemented via iptables NAT rules.
-
----
-
-### Q32. What is overlay network?
+## Q31. How does port mapping work?
 
 **Answer:**
-Spans multiple Docker hosts. Used by Swarm and Kubernetes (via CNI plugins). Encapsulates traffic in VXLAN so containers on different machines share an L2 network.
 
----
-
-## Volumes and Storage
-
-### Q33. Volume types?
-
-| Type | Managed by Docker | Path control | Best for |
-|------|-------------------|--------------|----------|
-| Named volume | Yes | No (Docker chooses) | Production data |
-| Bind mount | No | Yes (host path) | Dev, configs |
-| `tmpfs` | Memory only | N/A | Secrets, scratch |
+`-p HOST:CONTAINER` tells Docker to forward traffic from a host port to a container port through iptables NAT rules.
 
 ```bash
-docker run -v dbdata:/var/lib/postgresql/data postgres        # named
-docker run -v $(pwd)/src:/app/src myapp                       # bind
-docker run --tmpfs /tmp myapp                                 # tmpfs
+docker run -d -p 8080:80 nginx
+# Hitting localhost:8080 on the host reaches port 80 in the container.
+
+docker run -d -p 127.0.0.1:8080:80 nginx
+# Bind only to localhost (not exposed to the network).
+```
+
+## Q32. What is an overlay network?
+
+**Answer:**
+
+An overlay network spans multiple Docker hosts. Containers on different machines can talk to each other as if on the same network, using VXLAN tunneling underneath. Used in Docker Swarm and (in spirit) Kubernetes.
+
+```bash
+docker network create -d overlay --attachable my-overlay
 ```
 
 ---
 
-### Q34. Why prefer named volumes in production?
+## 6. Volumes and Storage
+
+## Q33. What are the volume types?
 
 **Answer:**
-- Decoupled from host paths (portable).
-- Backed up and managed via Docker CLI.
-- Permissions handled correctly.
-- Drivers support remote storage (NFS, EBS).
 
-Bind mounts are fine for development, but couple containers to host filesystem layout.
+| Type         | Definition                                                |
+| ------------ | --------------------------------------------------------- |
+| Named volume | Managed by Docker, lives under `/var/lib/docker/volumes`  |
+| Bind mount   | A specific host path mounted into the container           |
+| tmpfs        | In-memory only; data gone when container stops            |
 
----
+```bash
+# Named volume
+docker run -v dbdata:/var/lib/postgresql/data postgres:16
 
-### Q35. How to back up a named volume?
+# Bind mount
+docker run -v $(pwd)/code:/app node:20 node /app/server.js
+
+# tmpfs
+docker run --tmpfs /tmp:size=64m alpine
+```
+
+## Q34. Why prefer named volumes in production?
+
+**Answer:**
+
+Named volumes are managed by Docker. They are portable, get a stable name, can be backed up easily, and do not depend on any specific host directory layout. Bind mounts couple your container to host paths, which makes them fragile when you migrate to another machine.
+
+```yaml
+services:
+  db:
+    image: postgres:16
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+volumes:
+  dbdata:
+```
+
+## Q35. How do you back up a named volume?
+
+**Answer:**
+
+Run a temporary container that mounts both the volume and a host directory, and tar the data out.
 
 ```bash
 docker run --rm \
   -v dbdata:/data \
   -v $(pwd):/backup \
   alpine \
-  tar czf /backup/dbdata-$(date +%F).tar.gz -C /data .
+  tar czf /backup/dbdata-$(date +%F).tgz -C /data .
 ```
 
----
+To restore:
 
-### Q36. Volume vs `VOLUME` in Dockerfile?
+```bash
+docker run --rm \
+  -v dbdata:/data \
+  -v $(pwd):/backup \
+  alpine \
+  sh -c "cd /data && tar xzf /backup/dbdata-2025-05-05.tgz"
+```
+
+## Q36. What is the difference between `volumes:` in compose and `VOLUME` in Dockerfile?
 
 **Answer:**
-`VOLUME /data` declares a mount point — Docker auto-creates an anonymous volume if none is mounted. Anonymous volumes accumulate; prefer mounting explicit named volumes at runtime.
+
+`VOLUME` in a Dockerfile declares that a path inside the image should be a volume mount point. If you do not provide a volume at runtime, Docker creates an anonymous volume for it. Anonymous volumes are easy to lose track of.
+
+In Compose, `volumes:` explicitly maps a named volume or host path to a container directory. This is much clearer.
+
+In practice: avoid `VOLUME` in Dockerfiles for application images; let the operator decide using compose or `-v`.
 
 ---
 
-## Security
+## 7. Security
 
-### Q37. Docker security best practices?
+## Q37. What are Docker security best practices?
 
 **Answer:**
-1. **Don't run as root** — `USER node` in Dockerfile.
-2. **Use minimal base images** (distroless, alpine).
-3. **Pin versions** — never `latest`.
-4. **Scan images** — `docker scout cves`, Trivy, Snyk.
-5. **Sign images** — Cosign / Docker Content Trust.
-6. **Drop capabilities** — `--cap-drop=ALL --cap-add=NET_BIND_SERVICE`.
-7. **Read-only filesystem** — `--read-only` with `--tmpfs /tmp`.
-8. **No new privileges** — `--security-opt=no-new-privileges`.
-9. **Don't mount the Docker socket** into containers (full host control).
-10. **Use secrets** for credentials — not ENV.
-11. **Limit resources** to prevent DoS.
-12. **Patch the daemon** — Docker itself.
 
----
+1. Use small, well-known base images and pin versions.
+2. Run as a non-root user inside the container.
+3. Make the filesystem read-only when possible (`--read-only`).
+4. Drop unnecessary Linux capabilities (`--cap-drop=ALL`).
+5. Never run with `--privileged` unless absolutely required.
+6. Scan images for known vulnerabilities in CI.
+7. Keep secrets out of images; pass them at runtime.
 
-### Q38. How to run as non-root?
+```bash
+docker run --rm \
+  --read-only \
+  --tmpfs /tmp \
+  --cap-drop=ALL \
+  --user 1000:1000 \
+  myapp
+```
+
+## Q38. How do you run a container as a non-root user?
+
+**Answer:**
+
+Create a user in the Dockerfile and switch to it. Many official base images already include a non-root user.
 
 ```dockerfile
 FROM node:20-alpine
-RUN addgroup -S app && adduser -S -G app app
 WORKDIR /app
-COPY --chown=app:app . .
-USER app
+COPY --chown=node:node . .
+USER node
 CMD ["node", "server.js"]
 ```
 
-For ports < 1024, you need `setcap` or run on a higher port and proxy.
-
----
-
-### Q39. How to scan images for vulnerabilities?
+Or set the user at runtime:
 
 ```bash
-docker scout cves myimage:tag
-trivy image myimage:tag
-grype myimage:tag
+docker run --user 1000:1000 myapp
 ```
 
-Wire scanning into CI; fail builds on HIGH/CRITICAL CVEs.
-
----
-
-### Q40. What is image signing?
+## Q39. How do you scan images for vulnerabilities?
 
 **Answer:**
-Cryptographic verification that an image is from the expected publisher and unmodified. Tools:
-- **Cosign (Sigstore)** — keyless signing, common in modern CI.
-- **Docker Content Trust** — older Notary-based signing.
+
+Use a scanner like `trivy`, `grype`, or `docker scout`. They examine each image layer and report known CVEs.
 
 ```bash
-cosign sign ghcr.io/org/app:1.0.0
-cosign verify --certificate-identity=... ghcr.io/org/app:1.0.0
+trivy image --severity HIGH,CRITICAL myapp:1.0
+docker scout cves myapp:1.0
 ```
 
-Kubernetes admission controllers (Connaisseur, Kyverno) enforce signed images only.
+In CI, fail the build when critical CVEs appear.
+
+## Q40. What is image signing?
+
+**Answer:**
+
+Image signing produces a cryptographic signature you can verify before running an image. It proves the image came from a trusted publisher and has not been tampered with. Tools include cosign (Sigstore) and Docker Content Trust.
+
+```bash
+# Sign with cosign
+cosign sign --key cosign.key ghcr.io/myorg/myapp:1.0
+
+# Verify
+cosign verify --key cosign.pub ghcr.io/myorg/myapp:1.0
+```
+
+## Q41. How do you handle secrets safely?
+
+**Answer:**
+
+Do not put secrets in Dockerfiles, image layers, or `ENV` variables baked into the image. Pass them at runtime through environment variables, mounted files, or a secrets manager.
+
+```bash
+# At runtime, from your local environment
+docker run -e DB_PASSWORD="$DB_PASSWORD" myapp
+
+# Mount from a file
+docker run -v /etc/secrets/api.key:/run/secrets/api.key:ro myapp
+```
+
+In Compose use `secrets:`:
+
+```yaml
+services:
+  app:
+    image: myapp
+    secrets:
+      - db_password
+secrets:
+  db_password:
+    file: ./db_password.txt
+```
+
+## Q42. Why should you never mount `/var/run/docker.sock` into a container?
+
+**Answer:**
+
+Mounting the Docker socket gives the container full control of the Docker daemon. Anyone inside the container can spawn new privileged containers on the host, mount the host's root filesystem, and effectively become root on the host. It is equivalent to giving root access.
+
+If you need Docker-in-Docker for CI, use the rootless `dind` image inside an isolated runner, never on a shared host.
 
 ---
 
-### Q41. How to handle secrets safely?
+## 8. Production Patterns
+
+## Q43. What is Docker Swarm?
 
 **Answer:**
-**Don't:**
-- Bake secrets into images via ENV/ARG.
-- Commit secrets to Git.
 
-**Do:**
-- BuildKit secrets at build time:
-  ```dockerfile
-  RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci
-  ```
-  ```bash
-  docker build --secret id=npmrc,src=$HOME/.npmrc .
-  ```
-- Runtime: Docker Secrets (Swarm), Kubernetes Secrets, HashiCorp Vault, AWS Secrets Manager, mounted files, or env injected by orchestrator.
-
----
-
-### Q42. Why never mount `/var/run/docker.sock` into a container?
-
-**Answer:**
-The socket is a root API. A container with the socket can:
-- Run a privileged container.
-- Mount the host filesystem.
-- Effectively become root on the host.
-
-If absolutely required (e.g., CI runners), use rootless Docker or a socket proxy that whitelists endpoints.
-
----
-
-## Production Patterns
-
-### Q43. Docker Swarm overview?
-
-**Answer:**
-Built-in container orchestrator. Modes: manager and worker nodes. Features:
-- Declarative service definition.
-- Rolling updates.
-- Built-in load balancer (routing mesh).
-- Overlay networking.
-- Secrets and configs.
+Docker Swarm is Docker's built-in clustering and orchestration tool. You join several Docker hosts into a swarm; Swarm schedules services across them, manages overlay networking, performs rolling updates, and handles failover. It is simpler than Kubernetes but much less feature-rich.
 
 ```bash
 docker swarm init
-docker stack deploy -c docker-compose.yml myapp
+docker service create --name web --replicas 3 -p 80:80 nginx
 docker service ls
+docker service update --image nginx:1.27 web   # rolling update
 ```
 
-Mostly superseded by Kubernetes, but simpler for small deployments.
-
----
-
-### Q44. Swarm vs Kubernetes?
-
-| Aspect | Swarm | Kubernetes |
-|--------|-------|------------|
-| Setup | Built-in, minutes | Complex, hours |
-| Scaling | Up to ~1000 nodes | 5000+ nodes |
-| Ecosystem | Small | Massive |
-| Features | Basic | Auto-scaling, operators, CRDs, etc. |
-| Learning curve | Easy | Steep |
-| Community | Declining | Dominant |
-
-Use Swarm for simple deploys you control end-to-end; Kubernetes for everything else at scale.
-
----
-
-### Q45. Common production patterns?
-
-1. **Sidecar** — auxiliary container next to the main app (logging, proxy).
-2. **Init container** — runs to completion before the main container starts (migrations).
-3. **Ambassador** — proxy that abstracts external services.
-4. **Adapter** — normalizes outputs (e.g., logs to a standard format).
-5. **Worker pool** — N replicas of a queue consumer behind a queue.
-
----
-
-### Q46. How to log from containers?
+## Q44. Swarm vs Kubernetes — when do you choose which?
 
 **Answer:**
-Write to stdout/stderr; let the orchestrator route logs.
+
+| Aspect          | Swarm                       | Kubernetes                  |
+| --------------- | --------------------------- | --------------------------- |
+| Setup           | Single command              | Complex (or use managed)    |
+| Learning curve  | Low                         | High                        |
+| Ecosystem       | Small                       | Huge                        |
+| Use case        | Small teams, simple needs   | Large, complex platforms    |
+
+Choose Swarm for small projects where simplicity matters. Choose Kubernetes when you need autoscaling, advanced networking, ingress, observability, and a thriving ecosystem.
+
+## Q45. What are common production patterns?
+
+**Answer:**
+
+1. One process per container.
+2. Stateless application containers; state in databases or named volumes.
+3. Configuration via environment variables.
+4. Logs to stdout/stderr (let the orchestrator collect them).
+5. Health checks defined and used by the orchestrator.
+6. Resource limits set on every container.
+7. Images pinned to immutable tags or digests.
+
+## Q46. How do you log from containers?
+
+**Answer:**
+
+The convention is for the application to write logs to stdout and stderr. Docker captures them automatically and you can ship them with a logging driver.
 
 ```bash
-docker logs -f --tail 100 mycontainer
+docker run --log-driver=json-file --log-opt max-size=10m --log-opt max-file=3 myapp
 ```
 
-Logging drivers: `json-file` (default), `journald`, `syslog`, `fluentd`, `awslogs`, `gelf`. Configure rotation:
+Or send to a remote system:
+
+```bash
+docker run --log-driver=fluentd --log-opt fluentd-address=fluentd:24224 myapp
+```
+
+In Compose:
 
 ```yaml
-logging:
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "5"
+services:
+  app:
+    image: myapp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 ```
 
-Otherwise logs grow unbounded and fill the disk.
+## Q47. How do you do a zero-downtime deploy with Compose?
+
+**Answer:**
+
+Plain Docker Compose stops the old container before starting the new one, which causes a brief outage. To avoid that, use a small load balancer (Nginx, Traefik) and start the new container alongside the old one, then switch traffic.
+
+```bash
+docker compose up -d --no-deps --scale api=2 api
+# wait for new container to become healthy
+docker compose up -d --no-deps --scale api=1 api  # drops the old one
+```
+
+For real zero-downtime, prefer Swarm (`docker service update`) or Kubernetes rolling deployments.
 
 ---
 
-### Q47. Zero-downtime deploys with Compose?
+## 9. BuildKit and Advanced Builds
+
+## Q48. What is BuildKit?
 
 **Answer:**
-Compose isn't designed for it. Patterns:
-- Run two stacks behind a reverse proxy (blue/green) and switch upstream.
-- Use `docker compose up -d --no-deps --build service` with multiple replicas + healthchecks + a proxy with retries.
 
-For real zero-downtime, use Swarm rolling updates or Kubernetes.
-
----
-
-## BuildKit and Advanced Builds
-
-### Q48. What is BuildKit?
-
-**Answer:**
-The modern Docker build engine, default in Docker 23+. Improvements:
-- Parallel stage execution.
-- Better cache (content-addressable, exportable).
-- Build secrets (`--mount=type=secret`).
-- SSH forwarding (`--mount=type=ssh`).
-- Cache mounts (`--mount=type=cache`).
-- Frontend support (e.g., Dockerfile, but also Buildpacks).
+BuildKit is the modern Docker build engine. It is faster, supports parallel layer builds, secret mounts, cache mounts, and remote caches. It is the default in modern Docker.
 
 ```dockerfile
 # syntax=docker/dockerfile:1.7
-
 FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 COPY . .
-RUN npm run build
 ```
 
----
+The `--mount=type=cache` keeps the npm cache between builds without bloating the final image.
 
-### Q49. What is `buildx`?
+## Q49. What is `buildx`?
 
 **Answer:**
-Docker CLI plugin for BuildKit — supports multi-platform, remote builders, and advanced cache.
+
+`buildx` is a CLI plugin that wraps BuildKit. It adds features like building for multiple architectures, pushing to multiple registries, and using remote builders.
 
 ```bash
-docker buildx create --name multi --use
+docker buildx create --use --name mybuilder
+docker buildx build --platform linux/amd64,linux/arm64 -t myorg/app:1.0 --push .
+```
+
+## Q50. How do you build multi-architecture images?
+
+**Answer:**
+
+Use `buildx` with the `--platform` flag. BuildKit emulates the foreign architecture using QEMU.
+
+```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag ghcr.io/org/app:1.0.0 \
+  -t ghcr.io/myorg/app:1.0 \
+  --push .
+```
+
+The resulting image is a multi-arch manifest; pulling on an Apple Silicon Mac fetches the arm64 variant, pulling on an x86 server fetches the amd64 variant — all transparently.
+
+## Q51. Cache mounts vs layer cache?
+
+**Answer:**
+
+Layer cache reuses a whole layer if its inputs match. Cache mounts let a single `RUN` step keep a directory around between builds without saving it as a layer. This is great for package manager caches.
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && apt-get install -y curl
+```
+
+The downloaded `.deb` files persist between builds, so subsequent `apt-get install` calls reuse them.
+
+## Q52. What is a remote (registry) cache?
+
+**Answer:**
+
+A registry cache stores BuildKit's cache layers in a container registry. CI runners can share a cache without having a persistent disk.
+
+```bash
+docker buildx build \
+  --cache-from=type=registry,ref=ghcr.io/myorg/app:buildcache \
+  --cache-to=type=registry,ref=ghcr.io/myorg/app:buildcache,mode=max \
+  -t ghcr.io/myorg/app:1.0 \
   --push .
 ```
 
 ---
 
-### Q50. How to build multi-arch images?
+## 10. Debugging and Troubleshooting
+
+## Q53. How do you debug a failing container?
 
 **Answer:**
-With buildx + QEMU emulation or native multi-arch builders:
 
 ```bash
-docker run --privileged --rm tonistiigi/binfmt --install all
-docker buildx build --platform linux/amd64,linux/arm64 -t myimg --push .
+docker ps -a                           # see exit code (under STATUS)
+docker logs <container>                # see what it printed
+docker inspect <container>             # full JSON: env, mounts, networks
+docker exec -it <container> sh         # if it is still running
 ```
 
-The result is a manifest list — clients pull the matching arch.
+If it exits immediately, override the entrypoint to get a shell:
 
----
+```bash
+docker run -it --entrypoint sh myapp
+```
 
-### Q51. Cache mounts vs layer cache?
+## Q54. The container exits immediately. Why?
 
 **Answer:**
-- **Layer cache** — entire layer reused if instruction is unchanged.
-- **Cache mount** — directory persisted across builds without baking into the image.
 
-Cache mounts are great for package managers:
-```dockerfile
-RUN --mount=type=cache,target=/var/cache/apt \
-    --mount=type=cache,target=/var/lib/apt/lists \
-    apt-get update && apt-get install -y curl
-```
+Common causes:
 
-The mounted directory does not become part of the image.
-
----
-
-### Q52. Remote/registry cache?
+1. The CMD/ENTRYPOINT exits with an error — check `docker logs`.
+2. The main process is a daemon that backgrounds itself; PID 1 exits and the container stops. Run the process in the foreground.
+3. The application crashes on missing env vars.
+4. A volume or bind mount overwrites a directory the app needs.
 
 ```bash
-docker buildx build \
-  --cache-from=type=registry,ref=ghcr.io/org/app:cache \
-  --cache-to=type=registry,ref=ghcr.io/org/app:cache,mode=max \
-  -t ghcr.io/org/app:1.0.0 --push .
+docker run myapp
+docker ps -a    # STATUS: Exited (1) 2 seconds ago
+docker logs <container_id>
 ```
 
-Crucial in CI where each runner is fresh.
-
----
-
-## Debugging and Troubleshooting
-
-### Q53. Debugging a failing container?
-
-```bash
-docker logs <container>                        # check stderr/stdout
-docker inspect <container>                     # state, exit code, mounts
-docker exec -it <container> sh                 # shell in running container
-docker run --rm -it --entrypoint sh myimage    # shell into image without entrypoint
-docker events                                  # live daemon events
-docker stats                                   # CPU/mem live
-docker top <container>                         # processes inside container
-docker diff <container>                        # filesystem changes
-```
-
-For distroless / scratch images: build a debug variant or use `docker debug` (Docker Desktop) / `kubectl debug`.
-
----
-
-### Q54. Container exits immediately. Why?
-
-**Common causes:**
-1. **No long-running process** — e.g., `CMD ["bash"]` exits because there's no TTY. Use `-it` for interactive.
-2. **Crash on startup** — check `docker logs` and exit code (`docker inspect --format='{{.State.ExitCode}}'`).
-3. **Missing dependency / wrong base image arch** (e.g., x86 binary on arm64).
-4. **PID 1 issues** — shell-form CMD swallows signals.
-5. **Missing config / env vars**.
-6. **Port already in use**.
-
----
-
-### Q55. Disk filling up — how to investigate?
-
-```bash
-docker system df                  # overview
-docker system df -v               # detailed per-resource
-docker image prune -a             # remove unused images
-docker container prune            # remove stopped containers
-docker volume prune               # remove unused volumes
-docker builder prune --all        # build cache
-docker system prune -af --volumes # nuclear option
-```
-
-Common culprits: unbounded logs, accumulated build cache, dangling images, orphan volumes.
-
----
-
-### Q56. Common pitfalls in production?
-
-1. Running as root.
-2. Using `latest` tags.
-3. No resource limits.
-4. No healthchecks.
-5. Secrets in environment variables.
-6. Not handling SIGTERM (graceful shutdown).
-7. Logging to files instead of stdout.
-8. Building images with secrets in layers (`docker history` reveals them).
-9. Not using `.dockerignore` (huge build contexts, leaked files).
-10. Mounting Docker socket into containers.
-11. Building on unpinned base images.
-12. No image signing/scanning.
-
----
-
-### Q57. Performance tuning tips?
-
-- Use `slirp4netns` or `vpnkit` carefully on Mac/Windows — networking is slower than Linux.
-- Mount caches (npm, pip, go) with BuildKit.
-- Order Dockerfile for cache hits.
-- Use multi-stage builds.
-- Push only delta layers (registry already has bases).
-- Tune `--memory`, `--cpus`, `--ulimit` per workload.
-- For I/O heavy workloads, use named volumes (faster than bind mounts on Mac/Windows).
-
----
-
-### Q58. How does `docker exec` differ from `docker attach`?
+## Q55. The disk is filling up. How do you investigate?
 
 **Answer:**
-- `docker exec` — runs a new process in the container (e.g., a shell). Most common for debugging.
-- `docker attach` — attaches your terminal to the main process. Detaching wrong (Ctrl+C) can kill the container.
 
----
+```bash
+docker system df            # high-level breakdown
+docker system df -v         # per-image, per-container, per-volume
+docker images -a            # find big images
+docker ps -a -s             # show container size
+```
 
-### Q59. What is rootless Docker?
+Clean up:
+
+```bash
+docker container prune                  # stopped containers
+docker image prune -a                   # unused images
+docker volume prune                     # unused volumes (careful!)
+docker system prune -a --volumes        # everything (very careful!)
+```
+
+## Q56. What are common production pitfalls?
 
 **Answer:**
-Runs the daemon and containers as a non-root user, using user namespaces. Stronger isolation; no root on host even if container escapes. Some limitations: no privileged ports without setup, slightly slower networking.
 
----
+1. Logs written to a file inside the container instead of stdout, filling the container disk.
+2. No restart policy; an OOM kill takes the service down permanently.
+3. No memory limit; one container starves the host.
+4. Using `latest` tag and getting unexpected upgrades.
+5. Storing data in container layers instead of volumes; data lost on redeploy.
+6. Building on the production host instead of pushing to a registry.
+7. Mounting `/var/run/docker.sock` in user containers.
 
-### Q60. Production checklist?
+## Q57. What are some performance tuning tips?
 
-- [ ] Pinned base image (digest or specific version)
-- [ ] Multi-stage build with minimal final image
-- [ ] Non-root user
-- [ ] `.dockerignore` excludes secrets and build artifacts
-- [ ] HEALTHCHECK or orchestrator probe
-- [ ] Resource limits set
-- [ ] Restart policy
-- [ ] Logs to stdout, rotation configured
-- [ ] Vulnerability scan passing
-- [ ] Image signed
-- [ ] Read-only filesystem where possible
-- [ ] Secrets managed externally
-- [ ] Graceful SIGTERM handling
-- [ ] CI builds reproducible (locked dependencies)
-- [ ] Multi-arch images (if needed)
+**Answer:**
+
+1. Use Alpine or slim base images to reduce I/O.
+2. Pre-build production images in CI; never build in prod.
+3. Use `--init` (or tini) so PID 1 reaps zombies.
+4. Set CPU and memory limits matching the workload.
+5. Tune the logging driver — `json-file` with size caps prevents log bloat.
+6. Use BuildKit cache mounts for faster CI.
+
+## Q58. How does `docker exec` differ from `docker attach`?
+
+**Answer:**
+
+`docker exec` starts a new process inside an existing container. `docker attach` connects your terminal to the container's main process (PID 1).
+
+If you `Ctrl+C` an `attach` session, you may signal the main process and kill the container. With `exec`, you only kill the new process.
+
+```bash
+docker exec -it web sh    # safe; starts a new shell
+docker attach web         # connects to PID 1; Ctrl+C may stop the container
+```
+
+## Q59. What is rootless Docker?
+
+**Answer:**
+
+Rootless Docker runs the daemon and containers as a non-root user on the host. This greatly reduces the attack surface: even if a container escapes, the attacker is limited to the unprivileged user.
+
+```bash
+curl -fsSL https://get.docker.com/rootless | sh
+systemctl --user start docker
+```
+
+Trade-offs: some features (low ports < 1024, certain network drivers, AppArmor) are restricted.
+
+## Q60. What is a sensible production checklist?
+
+**Answer:**
+
+- Pinned image tags or digests
+- Multi-stage builds; small final image
+- Non-root user inside the container
+- Resource limits (`--memory`, `--cpus`)
+- Restart policy `unless-stopped`
+- HEALTHCHECK defined
+- Logs to stdout, with rotation configured
+- Secrets via env or secret store, never baked in
+- `.dockerignore` excludes `.git`, `node_modules`, secrets
+- Image scanned for CVEs in CI
+- Registry authentication via OIDC, not long-lived tokens

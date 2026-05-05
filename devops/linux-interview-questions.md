@@ -1,332 +1,365 @@
 # Linux Interview Questions
 
-**Level:** Mid to Senior
-**Topics:** Filesystem, Permissions, Processes, Systemd, Networking, SSH, Bash, Text Processing, Troubleshooting
+A practical, teaching-style Q&A guide for Linux. Each question gives a plain-language explanation followed by a working command and example output where useful.
 
 ---
 
 ## Table of Contents
 
-1. [Filesystem and FHS](#filesystem-and-fhs)
-2. [Permissions](#permissions)
-3. [Processes and Signals](#processes-and-signals)
-4. [Services and Systemd](#services-and-systemd)
-5. [Networking](#networking)
-6. [SSH](#ssh)
-7. [Bash Scripting](#bash-scripting)
-8. [Text Processing](#text-processing)
-9. [File Operations](#file-operations)
-10. [Package Management](#package-management)
-11. [Users and Cron](#users-and-cron)
-12. [Monitoring and Troubleshooting](#monitoring-and-troubleshooting)
+1. Filesystem and FHS
+2. Permissions
+3. Processes and Signals
+4. Services and Systemd
+5. Networking
+6. SSH
+7. Bash Scripting
+8. Text Processing
+9. File Operations
+10. Package Management
+11. Users and Cron
+12. Monitoring and Troubleshooting
 
 ---
 
-## Filesystem and FHS
+## 1. Filesystem and FHS
 
-### Q1. What is the Filesystem Hierarchy Standard (FHS)?
+## Q1. What is the Filesystem Hierarchy Standard (FHS)?
 
 **Answer:**
-A convention for the directory layout of Linux systems.
 
-| Path | Purpose |
-|------|---------|
-| `/` | Root |
-| `/bin`, `/usr/bin` | Essential user binaries |
-| `/sbin`, `/usr/sbin` | System binaries (often root-only) |
-| `/etc` | System configuration |
-| `/home` | User home directories |
-| `/var` | Variable data — logs, mail, spool |
-| `/var/log` | System logs |
-| `/tmp` | Temporary, world-writable, often cleared on reboot |
-| `/opt` | Optional/third-party software |
-| `/usr` | Read-only user data — most binaries, libs, docs |
-| `/lib`, `/usr/lib` | Shared libraries |
-| `/proc` | Virtual fs exposing kernel/process info |
-| `/sys` | Virtual fs exposing devices/kernel |
-| `/dev` | Device files |
-| `/boot` | Kernel and bootloader |
-| `/mnt`, `/media` | Mount points |
-| `/root` | Root user's home |
-| `/run` | Runtime state (PID files, sockets) |
+FHS defines the standard layout of directories on a Linux system. It is why every Linux distribution puts user binaries in `/usr/bin`, configs in `/etc`, and logs in `/var/log`. Knowing the layout helps you find files quickly.
 
----
+| Path        | Purpose                                                  |
+| ----------- | -------------------------------------------------------- |
+| `/etc`      | System-wide configuration files                          |
+| `/var`      | Variable data: logs, mail, databases, caches             |
+| `/usr/bin`  | User-installed binaries (`ls`, `python`, `node`)         |
+| `/usr/sbin` | System administration binaries                           |
+| `/home`     | User home directories                                    |
+| `/tmp`      | Temporary files; cleared on reboot                       |
+| `/proc`     | Virtual filesystem exposing kernel and process info      |
+| `/sys`      | Virtual filesystem exposing devices                      |
+| `/dev`      | Device files                                             |
+| `/opt`      | Optional, third-party software                           |
 
-### Q2. What is an inode?
+```bash
+ls /
+# bin  boot  dev  etc  home  lib  opt  proc  root  run  sbin  sys  tmp  usr  var
+```
+
+## Q2. What is an inode?
 
 **Answer:**
-A data structure storing metadata for a file: permissions, owner, size, timestamps, and pointers to data blocks. The filename lives in a directory entry that maps name → inode.
+
+An inode is a data structure on the filesystem that stores metadata about a file: its size, permissions, owner, timestamps, and pointers to the actual disk blocks. Notice the filename is *not* in the inode — names live in directories, which map names to inode numbers.
+
+A filesystem can run out of inodes even when there is free disk space, usually from millions of tiny files.
 
 ```bash
-ls -i file.txt    # show inode
-df -i             # inode usage per filesystem
-stat file.txt     # full inode info
+ls -li /etc/hosts
+# 12345 -rw-r--r-- 1 root root 220 May  5 10:00 /etc/hosts
+#   ^ inode number
+
+df -i      # show inode usage per filesystem
+# Filesystem     Inodes IUsed IFree IUse% Mounted on
+# /dev/sda1     2621440  98K  2.5M    4% /
 ```
 
-You can run out of inodes even with disk space free (millions of tiny files).
-
----
-
-### Q3. Hard link vs symbolic link?
-
-| | Hard link | Symbolic (soft) link |
-|---|---|---|
-| Points to | Inode | Path |
-| Across filesystems | No | Yes |
-| Survives target deletion | Yes (shares inode) | Becomes broken |
-| Directories | Not allowed (typically) | Allowed |
-| Created by | `ln src link` | `ln -s src link` |
-
----
-
-### Q4. What is `/proc`?
+## Q3. What is the difference between a hard link and a symbolic link?
 
 **Answer:**
-A virtual filesystem exposing kernel and process state.
+
+A hard link is a second name pointing to the same inode. The file exists as long as at least one hard link points to it. Hard links cannot cross filesystems and cannot point to directories.
+
+A symbolic (soft) link is a tiny file containing a path to another file. If you delete the target, the symlink becomes broken.
 
 ```bash
-cat /proc/cpuinfo
-cat /proc/meminfo
-cat /proc/<pid>/status
-cat /proc/<pid>/limits
-cat /proc/sys/net/ipv4/tcp_keepalive_time
-ls /proc/<pid>/fd        # open file descriptors
+echo "hello" > original.txt
+ln original.txt hardlink.txt        # hard link (same inode)
+ln -s original.txt softlink.txt     # symbolic link
+
+ls -li
+# 12345 -rw-r--r-- 2 user user 6 May  5 10:00 hardlink.txt
+# 12345 -rw-r--r-- 2 user user 6 May  5 10:00 original.txt   <- same inode
+# 67890 lrwxrwxrwx 1 user user 12 May  5 10:00 softlink.txt -> original.txt
 ```
 
-`/proc/sys` lets you tune kernel parameters at runtime; persist them in `/etc/sysctl.conf` or `/etc/sysctl.d/`.
-
----
-
-## Permissions
-
-### Q5. Explain Linux file permissions.
+## Q4. What is `/proc`?
 
 **Answer:**
-Three classes (owner, group, other) × three perms (read, write, execute).
 
-```
--rwxr-xr--
-```
-
-| Char | Octal | Meaning |
-|------|-------|---------|
-| r | 4 | read |
-| w | 2 | write |
-| x | 1 | execute (or traverse for dir) |
-
-`rwxr-xr--` = `754` (7 owner, 5 group, 4 other).
-
----
-
-### Q6. `chmod` examples?
+`/proc` is a virtual filesystem that exposes kernel and process information as files. Tools like `ps`, `top`, and `free` read from it.
 
 ```bash
-chmod 644 file              # rw-r--r--
-chmod 755 script.sh         # rwxr-xr-x
-chmod u+x script.sh         # add execute for owner
-chmod g-w file              # remove write for group
-chmod o= file               # remove all for others
-chmod -R 750 dir            # recursive
-chmod a+r file              # all (ugo) read
+cat /proc/cpuinfo            # CPU info
+cat /proc/meminfo            # memory info
+cat /proc/loadavg            # system load
+cat /proc/$$/status          # status of current shell process
+ls /proc/1/                  # PID 1 (init/systemd)
 ```
 
 ---
 
-### Q7. `chown` and `chgrp`?
+## 2. Permissions
 
-```bash
-chown alice file
-chown alice:devs file       # owner and group
-chown -R alice:devs /srv/app
-chgrp devs file
-```
-
----
-
-### Q8. What is `umask`?
+## Q5. Explain Linux file permissions.
 
 **Answer:**
-The default permission mask for newly created files. Subtracted from base permissions (666 for files, 777 for dirs).
+
+Each file has three permission triplets — for the owner, the group, and others. Each triplet has read (r), write (w), and execute (x) bits. `ls -l` shows them as nine characters.
 
 ```bash
-umask         # show current
-umask 022     # default for many systems → files 644, dirs 755
-umask 077     # files 600, dirs 700 (private)
+ls -l script.sh
+# -rwxr-xr-- 1 alice devs 120 May  5 10:00 script.sh
+#  ^^^^^^^^^
+#  owner=rwx  group=r-x  others=r--
 ```
 
-Set persistently in `/etc/profile`, `~/.bashrc`.
+Numerically, r=4, w=2, x=1, summed per triplet:
 
----
+| Mode | Triplet | Meaning            |
+| ---- | ------- | ------------------ |
+| 7    | rwx     | read, write, exec  |
+| 6    | rw-     | read, write        |
+| 5    | r-x     | read, exec         |
+| 4    | r--     | read only          |
 
-### Q9. SUID, SGID, sticky bit?
+So `chmod 755 file` means owner=rwx, group=r-x, others=r-x.
 
-| Bit | Octal | On file | On dir |
-|-----|-------|---------|--------|
-| SUID | 4000 | Executes as file's owner | n/a |
-| SGID | 2000 | Executes as file's group | New files inherit dir's group |
-| Sticky | 1000 | n/a | Only owner can delete files (e.g., `/tmp`) |
-
-```bash
-chmod u+s /usr/bin/passwd     # SUID
-chmod g+s /srv/shared          # SGID
-chmod +t /tmp                  # sticky
-ls -l                          # shows s/t in perms
-```
-
-`passwd` uses SUID to update `/etc/shadow` as root. SUID on shell scripts is ignored for security.
-
----
-
-### Q10. POSIX ACLs?
+## Q6. Give some `chmod` examples.
 
 **Answer:**
-Fine-grained permissions beyond owner/group/other.
 
 ```bash
-getfacl file
-setfacl -m u:bob:rwx file
-setfacl -x u:bob file
-setfacl -d -m g:devs:rx /srv/proj   # default ACL for new files in dir
+chmod 755 script.sh         # rwx for owner, rx for group/others
+chmod 600 secret.txt        # rw for owner only
+chmod +x script.sh          # add execute for everyone
+chmod u+rwx,go-rwx file     # symbolic notation
+chmod -R 644 docs/          # recursive (careful with directories)
 ```
 
-The `+` after permissions in `ls -l` indicates ACLs are present.
+For directories, `x` means "you can enter this directory."
 
----
-
-## Processes and Signals
-
-### Q11. View processes?
-
-```bash
-ps aux                        # all processes
-ps -ef                        # alternate format
-ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%cpu | head
-top                           # interactive
-htop                          # better top
-pgrep -fl node                # find by name
-pidof nginx
-```
-
----
-
-### Q12. Common kill signals?
-
-| Signal | Number | Default behavior |
-|--------|--------|------------------|
-| SIGTERM | 15 | Polite termination (default) |
-| SIGKILL | 9 | Force kill (uncatchable) |
-| SIGINT | 2 | Ctrl+C |
-| SIGHUP | 1 | Hangup; often used to reload config |
-| SIGSTOP | 19 | Pause (uncatchable) |
-| SIGCONT | 18 | Resume |
-| SIGUSR1/2 | 10/12 | App-defined |
-| SIGQUIT | 3 | Quit + core dump |
-
-```bash
-kill 1234            # SIGTERM
-kill -9 1234         # SIGKILL — last resort
-kill -HUP 1234       # reload
-killall nginx
-pkill -f "node worker"
-```
-
----
-
-### Q13. Process states?
-
-| State | Meaning |
-|-------|---------|
-| R | Running or runnable |
-| S | Interruptible sleep |
-| D | Uninterruptible sleep (usually I/O) — can't kill, even with -9 |
-| Z | Zombie (dead, parent hasn't reaped) |
-| T | Stopped |
-| < / N | High / low priority |
-
-`D`-state processes typically indicate stuck I/O (failing disk, NFS).
-
----
-
-### Q14. What is a zombie process?
+## Q7. How do you change ownership with `chown` and `chgrp`?
 
 **Answer:**
-A child that exited but whose parent hasn't called `wait()`. It holds an entry in the process table but no resources. Many zombies indicate a buggy parent. Reparenting to PID 1 (`init`/`systemd`) usually cleans them up.
-
----
-
-### Q15. Foreground vs background?
 
 ```bash
-long_running_cmd &           # background
-jobs                          # list jobs
-fg %1                         # bring to foreground
-bg %1                         # resume in background
-disown %1                     # detach from shell
-nohup cmd &                   # immune to HUP
-Ctrl+Z                        # suspend → SIGTSTP
+sudo chown alice file.txt              # change owner only
+sudo chown alice:devs file.txt         # change owner and group
+sudo chgrp devs file.txt               # change group only
+sudo chown -R www-data:www-data /var/www   # recursive
 ```
 
-For long-running commands across logout: `nohup`, `tmux`, `screen`, or systemd unit.
+You normally need root to change ownership.
 
----
-
-### Q16. Process vs thread?
+## Q8. What is `umask`?
 
 **Answer:**
-- **Process** — independent address space, own PID, isolated memory.
-- **Thread** — shares address space with siblings inside a process; LWP (light-weight process) on Linux.
 
-`ps -eLf` shows threads. `top -H` shows threads too.
-
----
-
-## Services and Systemd
-
-### Q17. What is systemd?
-
-**Answer:**
-The default init system on most modern distros. Manages services (units), sockets, timers, mounts, etc. Replaces SysV init, Upstart.
-
----
-
-### Q18. Common systemctl commands?
+`umask` is the default permission mask for newly created files. The mask is *subtracted* from the maximum permissions (666 for files, 777 for directories).
 
 ```bash
-systemctl status nginx
-systemctl start nginx
-systemctl stop nginx
-systemctl restart nginx
-systemctl reload nginx        # SIGHUP — config reload
-systemctl enable nginx        # start on boot
-systemctl disable nginx
-systemctl is-active nginx
+umask                  # show current mask
+# 0022
+
+# Default file: 666 - 022 = 644 (rw-r--r--)
+# Default dir : 777 - 022 = 755 (rwxr-xr-x)
+
+umask 077              # only owner can access new files
+touch test.txt
+ls -l test.txt
+# -rw------- 1 alice alice 0 May  5 10:00 test.txt
+```
+
+## Q9. What are SUID, SGID, and the sticky bit?
+
+**Answer:**
+
+- **SUID** on an executable means it runs with the file owner's privileges instead of the caller's. Example: `passwd` is SUID-root because it has to write `/etc/shadow`.
+- **SGID** on an executable runs as the file's group. SGID on a directory makes new files inherit the directory's group.
+- **Sticky bit** on a directory means only the file's owner can delete the file, even if others have write permission. Used on `/tmp`.
+
+```bash
+ls -l /usr/bin/passwd /tmp
+# -rwsr-xr-x 1 root root /usr/bin/passwd     <- 's' = SUID
+# drwxrwxrwt 1 root root /tmp                <- 't' = sticky
+
+chmod u+s file        # set SUID
+chmod g+s dir         # set SGID
+chmod +t dir          # set sticky
+```
+
+## Q10. What are POSIX ACLs?
+
+**Answer:**
+
+ACLs (Access Control Lists) extend the basic owner/group/other model. You can grant explicit permissions to additional users or groups.
+
+```bash
+setfacl -m u:bob:rw report.txt        # give bob rw access
+getfacl report.txt
+# user::rw-
+# user:bob:rw-
+# group::r--
+# mask::rw-
+# other::r--
+
+setfacl -x u:bob report.txt           # remove bob's ACL
+setfacl -b report.txt                 # remove all ACLs
+```
+
+A `+` at the end of `ls -l` permissions means an ACL is in effect.
+
+---
+
+## 3. Processes and Signals
+
+## Q11. How do you view processes?
+
+**Answer:**
+
+```bash
+ps aux                # all processes, BSD style
+ps -ef                # all processes, System V style
+ps -ef --forest       # tree view
+top                   # interactive, classic
+htop                  # nicer interactive (install separately)
+pgrep nginx           # PIDs by name
+pidof nginx           # one-line PIDs
+```
+
+Example output of `ps aux`:
+
+```text
+USER       PID %CPU %MEM    VSZ   RSS TTY  STAT START   TIME COMMAND
+root         1  0.0  0.1 168000 11000 ?    Ss   May04   0:01 /sbin/init
+www-data  1234  0.5  2.0 200000 80000 ?    S    10:00   0:05 nginx: worker
+```
+
+## Q12. What are common kill signals?
+
+**Answer:**
+
+| Signal     | Number | Meaning                                       |
+| ---------- | ------ | --------------------------------------------- |
+| SIGHUP     | 1      | Reload config (many daemons interpret this)   |
+| SIGINT     | 2      | Interrupt (what Ctrl+C sends)                 |
+| SIGTERM    | 15     | Polite "please terminate" (default for `kill`) |
+| SIGKILL    | 9      | Force kill; cannot be trapped                 |
+| SIGSTOP    | 19     | Pause process                                 |
+| SIGCONT    | 18     | Resume process                                |
+
+```bash
+kill 1234            # SIGTERM (graceful)
+kill -9 1234         # SIGKILL (force, last resort)
+kill -HUP 1234       # reload config
+killall nginx        # by name
+pkill -f "myscript"  # match by command line pattern
+```
+
+## Q13. What are process states?
+
+**Answer:**
+
+| State | Meaning                                                          |
+| ----- | ---------------------------------------------------------------- |
+| R     | Running or runnable                                              |
+| S     | Sleeping (interruptible — usually waiting on I/O)                |
+| D     | Uninterruptible sleep (usually disk I/O; cannot be killed)       |
+| Z     | Zombie (process exited; parent has not collected exit status)    |
+| T     | Stopped (paused by signal)                                       |
+
+You see them in the STAT column of `ps`.
+
+## Q14. What is a zombie process?
+
+**Answer:**
+
+A zombie is a child process that has exited but whose parent has not yet called `wait()` to collect its exit status. The kernel keeps a small entry around so the parent can still read the exit code.
+
+A few zombies are harmless. Many zombies usually mean a buggy parent process. If the parent dies, init/systemd inherits the children and reaps them.
+
+```bash
+ps aux | awk '$8=="Z"'    # find zombies
+```
+
+## Q15. What is the difference between foreground and background?
+
+**Answer:**
+
+```bash
+sleep 100             # runs in foreground; terminal blocks
+sleep 100 &           # runs in background; you get prompt back
+jobs                  # list background jobs
+fg %1                 # bring job 1 to foreground
+bg %1                 # resume stopped job in background
+Ctrl+Z                # suspend foreground job (then bg/fg)
+
+nohup myscript.sh &   # survives logout
+disown -h %1          # detach from current shell
+```
+
+## Q16. What is the difference between a process and a thread?
+
+**Answer:**
+
+A process has its own memory space (address space, file descriptors, etc.) and is isolated from other processes. A thread runs inside a process and shares memory with the other threads of that process. Threads are cheaper to create and to switch between, but they need synchronization to avoid corrupting shared data.
+
+```bash
+ps -eLf | head        # show threads (LWP column = thread ID)
+top -H                # interactive, threads view
+cat /proc/<pid>/status | grep Threads
+```
+
+---
+
+## 4. Services and Systemd
+
+## Q17. What is systemd?
+
+**Answer:**
+
+systemd is the init system used by most modern Linux distributions. It is PID 1 and is responsible for booting, managing services, mounting filesystems, handling logs, and more. You interact with it via `systemctl` (services) and `journalctl` (logs).
+
+## Q18. What are the most common `systemctl` commands?
+
+**Answer:**
+
+```bash
+sudo systemctl start nginx
+sudo systemctl stop nginx
+sudo systemctl restart nginx
+sudo systemctl reload nginx          # signal reload, no restart
+sudo systemctl enable nginx          # auto-start on boot
+sudo systemctl disable nginx
+systemctl status nginx               # current state and recent logs
+systemctl list-units --type=service  # all loaded service units
+systemctl list-unit-files            # installed units and enabled state
+systemctl is-active nginx            # active / inactive
 systemctl is-enabled nginx
-systemctl list-units --type=service
-systemctl list-units --failed
-systemctl daemon-reload       # after editing unit files
 ```
 
----
+## Q19. Show me a sample systemd unit file.
 
-### Q19. Sample systemd unit?
+**Answer:**
+
+A unit file describes how to manage a service: what to run, how to restart it, what it depends on, and which user to run as.
 
 ```ini
 # /etc/systemd/system/myapp.service
 [Unit]
-Description=My App
-After=network.target postgresql.service
-Requires=postgresql.service
+Description=My Node App
+After=network.target
 
 [Service]
 Type=simple
-User=app
-Group=app
-WorkingDirectory=/srv/myapp
-EnvironmentFile=/etc/myapp/env
-ExecStart=/usr/bin/node /srv/myapp/server.js
+User=myapp
+WorkingDirectory=/opt/myapp
+ExecStart=/usr/bin/node /opt/myapp/server.js
 Restart=on-failure
 RestartSec=5
-LimitNOFILE=65536
+Environment=NODE_ENV=production
 StandardOutput=journal
 StandardError=journal
 
@@ -334,198 +367,233 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-```bash
-systemctl daemon-reload
-systemctl enable --now myapp
-```
-
----
-
-### Q20. journalctl basics?
+After editing, reload and enable:
 
 ```bash
-journalctl -u nginx                  # for a unit
-journalctl -u nginx -f               # follow
-journalctl -u nginx --since "1 hour ago"
-journalctl -u nginx -n 100 --no-pager
-journalctl -p err                    # priority error+
-journalctl --disk-usage
-journalctl --vacuum-time=7d          # prune
+sudo systemctl daemon-reload
+sudo systemctl enable --now myapp
+journalctl -u myapp -f
 ```
 
-Persistent logs require `Storage=persistent` in `/etc/systemd/journald.conf` and `/var/log/journal` to exist.
-
----
-
-### Q21. Systemd timer vs cron?
+## Q20. What are the basics of `journalctl`?
 
 **Answer:**
-Both schedule jobs. Timers offer:
-- Logs in journal.
-- Dependencies on other units.
-- Accurate accounting (handles missed runs with `Persistent=true`).
-- Resource limits.
+
+`journalctl` reads systemd's structured log database.
+
+```bash
+journalctl                            # all logs
+journalctl -u nginx                   # logs for one unit
+journalctl -u nginx -f                # follow, like tail -f
+journalctl -u nginx --since "1 hour ago"
+journalctl -u nginx --since "2025-05-05" --until "2025-05-06"
+journalctl -p err                     # priority error or worse
+journalctl -k                         # kernel logs (dmesg)
+journalctl --disk-usage
+sudo journalctl --vacuum-time=7d      # prune older than 7 days
+```
+
+## Q21. What is the difference between systemd timers and cron?
+
+**Answer:**
+
+Both run jobs on a schedule. systemd timers integrate with units (logs go to journald, dependencies, environment, restart policies) and have richer scheduling. cron is simpler and ubiquitous.
+
+A timer needs two units: a service (what to run) and a timer (when to run it).
+
+```ini
+# myjob.service
+[Unit]
+Description=Run my job
+
+[Service]
+Type=oneshot
+ExecStart=/opt/myapp/cleanup.sh
+```
 
 ```ini
 # myjob.timer
 [Unit]
-Description=Daily job
+Description=Run myjob every hour
 
 [Timer]
-OnCalendar=daily
+OnCalendar=hourly
 Persistent=true
 
 [Install]
 WantedBy=timers.target
 ```
 
-Pair with `myjob.service`. `systemctl list-timers` shows next run.
-
----
-
-## Networking
-
-### Q22. Modern vs legacy networking commands?
-
-| Legacy | Modern |
-|--------|--------|
-| `ifconfig` | `ip addr`, `ip link` |
-| `route` | `ip route` |
-| `netstat` | `ss` |
-| `arp` | `ip neigh` |
-| `iptables` | `nftables`, `iptables` (still common) |
-
-Prefer modern tools — they're maintained and faster.
-
----
-
-### Q23. `ss` examples?
-
 ```bash
-ss -tulpn                  # TCP/UDP listening with PIDs
-ss -tan                    # all TCP
-ss -s                      # summary
-ss -tn state established
-ss dst :443                # connections to port 443
+sudo systemctl enable --now myjob.timer
+systemctl list-timers
 ```
 
 ---
 
-### Q24. `ip` command examples?
+## 5. Networking
 
-```bash
-ip addr                    # all interfaces
-ip -br addr                # brief
-ip link show
-ip route
-ip route add 10.0.0.0/24 via 192.168.1.1
-ip route get 8.8.8.8       # which path?
-ip neigh                   # ARP cache
-```
-
----
-
-### Q25. Diagnose connectivity?
-
-```bash
-ping host
-ping -c 4 host
-traceroute host            # path
-mtr host                   # continuous traceroute
-dig example.com            # DNS
-dig +short example.com
-dig @8.8.8.8 example.com   # query specific resolver
-nslookup example.com
-host example.com
-curl -v https://api.example.com
-curl -I https://api.example.com           # headers only
-curl -w "%{http_code} %{time_total}\n" -o /dev/null -s url
-nc -zv host 443            # TCP port reachable?
-telnet host 443            # legacy alternative
-```
-
----
-
-### Q26. iptables vs nftables vs ufw?
+## Q22. What is the difference between modern and legacy networking commands?
 
 **Answer:**
-- **iptables** — classic packet filter; many tutorials still use it.
-- **nftables** — modern replacement; unified syntax for IPv4/IPv6/ARP.
-- **ufw** — user-friendly frontend (Ubuntu).
-- **firewalld** — frontend on RHEL/CentOS/Fedora.
+
+Older tools (`ifconfig`, `route`, `netstat`) are deprecated in favor of the `ip` and `ss` commands from the `iproute2` package. The new ones are faster and show more detail.
+
+| Old        | New             |
+| ---------- | --------------- |
+| `ifconfig` | `ip addr`       |
+| `route`    | `ip route`      |
+| `netstat`  | `ss`            |
+| `arp`      | `ip neigh`      |
+
+## Q23. Give me some `ss` examples.
+
+**Answer:**
+
+```bash
+ss -tulpn               # TCP/UDP listening sockets with PIDs
+ss -tan                 # all TCP, numeric
+ss -s                   # summary statistics
+ss state established '( dport = :443 or sport = :443 )'
+```
+
+Example output:
+
+```text
+Netid State  Local Address:Port    Peer Address:Port  Process
+tcp   LISTEN 0.0.0.0:80            0.0.0.0:*          users:(("nginx",pid=1234))
+tcp   LISTEN 127.0.0.1:5432        0.0.0.0:*          users:(("postgres",pid=2345))
+```
+
+## Q24. Give me some `ip` command examples.
+
+**Answer:**
+
+```bash
+ip addr                          # show IP addresses
+ip -br addr                      # brief output
+ip route                         # routing table
+ip route get 1.1.1.1             # which route would be used
+ip link set eth0 up
+ip addr add 10.0.0.5/24 dev eth0
+ip route add default via 10.0.0.1
+```
+
+## Q25. How do you diagnose connectivity?
+
+**Answer:**
+
+Walk the layers from the bottom up.
+
+```bash
+ping 8.8.8.8                       # is the network reachable?
+ping example.com                   # does DNS work?
+dig example.com                    # which IPs does DNS return?
+traceroute example.com             # which hops; where it dies
+mtr example.com                    # combined ping + traceroute
+curl -v https://example.com        # full HTTP request/response
+nc -vz example.com 443             # is the port open?
+```
+
+## Q26. iptables vs nftables vs ufw — what is the difference?
+
+**Answer:**
+
+- **iptables** is the older firewall framework. Still widely used.
+- **nftables** is the modern replacement. Faster and unified.
+- **ufw** (Uncomplicated Firewall) is a simple front-end that wraps iptables/nftables. Easy for common cases.
 
 ```bash
 # ufw
-ufw allow 22/tcp
-ufw allow from 10.0.0.0/8 to any port 5432
-ufw enable
-ufw status verbose
+sudo ufw allow 22/tcp
+sudo ufw allow 80,443/tcp
+sudo ufw enable
+sudo ufw status verbose
 
 # iptables
-iptables -L -n -v
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+sudo iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+sudo iptables -L -n -v
+```
+
+## Q27. How do you find which process is using a port?
+
+**Answer:**
+
+```bash
+sudo ss -tulpn | grep :80
+# tcp LISTEN 0 511 0.0.0.0:80 0.0.0.0:* users:(("nginx",pid=1234,fd=6))
+
+sudo lsof -i :80
+sudo fuser 80/tcp
 ```
 
 ---
 
-### Q27. Find what process is using a port?
+## 6. SSH
+
+## Q28. How do you generate and use SSH keys?
+
+**Answer:**
 
 ```bash
-ss -tulpn | grep :3000
-lsof -iTCP:3000 -sTCP:LISTEN
-fuser 3000/tcp
+ssh-keygen -t ed25519 -C "you@example.com"
+# Generates ~/.ssh/id_ed25519 (private) and ~/.ssh/id_ed25519.pub (public)
+
+ssh-copy-id user@server
+# Or manually: append id_ed25519.pub to remote ~/.ssh/authorized_keys (mode 600)
 ```
 
----
+For better server security, disable password login:
 
-## SSH
-
-### Q28. Generate and use SSH keys?
-
-```bash
-ssh-keygen -t ed25519 -C "alice@example.com"   # ~/.ssh/id_ed25519
-ssh-copy-id user@host                          # install to remote
-# or manually: append id_ed25519.pub to ~/.ssh/authorized_keys (mode 600)
-```
-
-Use ed25519 (or rsa-4096 if compatibility needed). Always disable password auth in production:
-```
+```ini
 # /etc/ssh/sshd_config
 PasswordAuthentication no
 PermitRootLogin no
 ```
 
----
-
-### Q29. `~/.ssh/config` example?
-
+```bash
+sudo systemctl reload sshd
 ```
+
+## Q29. Show me a useful `~/.ssh/config` example.
+
+**Answer:**
+
+The SSH client reads `~/.ssh/config` to remember per-host settings, so you can type `ssh prod` instead of a long command.
+
+```text
+Host prod
+  HostName 10.0.0.5
+  User deploy
+  IdentityFile ~/.ssh/prod_ed25519
+  Port 22
+
+Host *.internal
+  ProxyJump bastion
+  User ubuntu
+
 Host bastion
   HostName bastion.example.com
-  User alice
-  IdentityFile ~/.ssh/id_ed25519
-
-Host db-prod
-  HostName 10.0.5.10
-  User ubuntu
-  ProxyJump bastion
-  IdentityFile ~/.ssh/id_prod
-  ServerAliveInterval 60
+  User ec2-user
+  IdentityFile ~/.ssh/bastion_ed25519
 ```
 
 ```bash
-ssh db-prod
+ssh prod
+ssh db.internal     # transparently goes through bastion
 ```
 
----
+## Q30. What is SSH tunneling?
 
-### Q30. SSH tunneling?
+**Answer:**
+
+SSH tunneling forwards TCP connections through an SSH session. Useful to reach a service that is not exposed to the internet by going through a bastion host.
 
 ```bash
-# Local forward: localhost:5433 → remote db:5432 via bastion
-ssh -L 5433:db-internal:5432 bastion
+# Local forward: localhost:5433 -> remote db:5432 via bastion
+ssh -L 5433:db:5432 bastion
 
-# Remote forward: bastion:8080 → my localhost:3000
+# Remote forward: bastion:8080 -> my localhost:3000
 ssh -R 8080:localhost:3000 bastion
 
 # Dynamic (SOCKS proxy)
@@ -535,621 +603,704 @@ ssh -D 1080 bastion
 ssh -fN -L 5433:db:5432 bastion
 ```
 
----
+## Q31. What is `ssh-agent`?
 
-### Q31. ssh-agent?
+**Answer:**
+
+`ssh-agent` is a small program that holds your private keys decrypted in memory so you do not have to type your passphrase every time.
 
 ```bash
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
-ssh-add -l
-ssh -A user@host           # forward agent (use cautiously)
-```
+ssh-add -l                      # list loaded keys
 
-Avoid `-A` to untrusted hosts — they can use your loaded keys.
+# Forwarding (use carefully — gives the remote server access to your keys)
+ssh -A user@server
+```
 
 ---
 
-## Bash Scripting
+## 7. Bash Scripting
 
-### Q32. Script template with safety flags?
+## Q32. Show me a script template with safety flags.
+
+**Answer:**
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-IFS=$'\n\t'
-
-# -e exit on error
+# -e exit on any error
 # -u error on unset variable
 # -o pipefail propagate errors through pipes
+
+IFS=$'\n\t'
+
+main() {
+  echo "Hello, $1"
+}
+
+main "$@"
 ```
 
----
+These flags catch a huge number of bugs early.
 
-### Q33. Variables and quoting?
+## Q33. How do you handle variables and quoting?
+
+**Answer:**
 
 ```bash
 name="alice"
-echo "Hello, $name"            # double quotes interpolate
-echo 'Hello, $name'            # single quotes literal
-echo "Files: $(ls | wc -l)"    # command substitution
-count=$(( 5 + 3 ))             # arithmetic
-echo "${name:-default}"        # default if unset
-echo "${name:=default}"        # assign default
-echo "${name:?must be set}"    # error if unset
-echo "${file##*/}"             # basename
-echo "${file%.*}"              # remove extension
+greet="Hello, $name"        # double quotes expand variables
+literal='Hello, $name'      # single quotes do not expand
+
+# ALWAYS quote variables to avoid word splitting
+file="my file.txt"
+ls "$file"                  # correct
+ls $file                    # WRONG: tries to ls "my" and "file.txt"
 ```
 
-Always quote variables with spaces: `"$var"`, especially in tests and arguments.
-
----
-
-### Q34. Conditionals?
+Command substitution:
 
 ```bash
-if [[ -f "$file" ]]; then
-  echo "file exists"
-elif [[ -d "$file" ]]; then
-  echo "dir"
+today="$(date +%F)"
+echo "$today"
+```
+
+## Q34. How do conditionals work?
+
+**Answer:**
+
+```bash
+if [[ -f /etc/hosts ]]; then
+  echo "exists"
+elif [[ -d /etc ]]; then
+  echo "etc dir exists"
 else
-  echo "missing"
+  echo "neither"
 fi
 
 # Common test flags
-[[ -e path ]]  # exists
-[[ -f path ]]  # regular file
-[[ -d path ]]  # directory
-[[ -r path ]]  # readable
-[[ -w path ]]  # writable
-[[ -x path ]]  # executable
-[[ -z $s   ]]  # empty string
-[[ -n $s   ]]  # non-empty
-[[ $a == $b ]] # equal
-[[ $a != $b ]]
-[[ $n -eq 5 ]] # numeric equal (-ne -lt -le -gt -ge)
-[[ $s =~ ^[0-9]+$ ]] # regex
+# -f file exists and is regular
+# -d directory
+# -e exists
+# -r readable
+# -z empty string
+# -n non-empty string
+# str1 == str2 / != / < / >
+# num1 -eq -ne -lt -le -gt -ge
+
+[[ "$user" == "root" ]] && echo "you are root"
 ```
 
-Use `[[ ]]` (bash) over `[ ]` (POSIX) — safer with strings and supports regex.
+## Q35. How do loops work?
 
----
-
-### Q35. Loops?
+**Answer:**
 
 ```bash
 for f in *.txt; do
   echo "$f"
 done
 
-for i in {1..10}; do echo $i; done
-for ((i=0; i<10; i++)); do echo $i; done
+for i in {1..5}; do
+  echo "$i"
+done
 
-while read -r line; do
-  echo "$line"
-done < file.txt
+# C-style
+for ((i=0; i<5; i++)); do
+  echo "$i"
+done
+
+# while
+i=0
+while (( i < 3 )); do
+  echo "$i"
+  ((i++))
+done
 
 # Process command output line by line
 while IFS= read -r line; do
-  echo ">> $line"
-done < <(ls)
+  echo "Got: $line"
+done < /etc/hosts
 ```
 
----
+## Q36. How do functions work?
 
-### Q36. Functions?
+**Answer:**
 
 ```bash
-log() {
-  local level=$1
-  shift
-  printf '[%s] %s\n' "$level" "$*" >&2
+greet() {
+  local name="$1"
+  echo "Hello, $name"
 }
 
-log INFO "starting"
+greet "alice"
 
 # Return value via echo (capture with $())
-sum() { echo $(( $1 + $2 )); }
-total=$(sum 3 4)
+add() {
+  echo $(( $1 + $2 ))
+}
+sum=$(add 2 3)
 
-# Exit code via return
-is_root() { [[ $EUID -eq 0 ]]; }
-if is_root; then ...; fi
+# Exit code via return (0 = success)
+is_root() {
+  [[ "$EUID" -eq 0 ]]
+}
+if is_root; then echo "root"; fi
 ```
 
----
+## Q37. How do arrays work in bash?
 
-### Q37. Arrays?
+**Answer:**
 
 ```bash
-arr=(one two three)
-echo "${arr[0]}"
-echo "${arr[@]}"            # all elements
-echo "${#arr[@]}"           # length
-arr+=(four)                 # append
+# Indexed
+files=(one.txt two.txt three.txt)
+echo "${files[0]}"             # one.txt
+echo "${#files[@]}"            # length: 3
+for f in "${files[@]}"; do echo "$f"; done
 
 # Associative (bash 4+)
-declare -A map
-map[name]=alice
-map[role]=admin
-echo "${map[name]}"
-for k in "${!map[@]}"; do echo "$k=${map[$k]}"; done
+declare -A user
+user[name]="alice"
+user[age]=30
+echo "${user[name]}"
+for key in "${!user[@]}"; do
+  echo "$key=${user[$key]}"
+done
 ```
 
----
+## Q38. How do exit codes and traps work?
 
-### Q38. Exit codes and traps?
+**Answer:**
+
+Every command has an exit code. 0 means success, non-zero is failure. `$?` holds the exit code of the last command.
 
 ```bash
-cmd
-echo $?              # exit code of last command (0 = success)
+ls /nonexistent
+echo "$?"        # 2
 
+# Traps run on signals or shell exit
 cleanup() {
-  rm -f /tmp/work.$$
+  rm -f /tmp/lockfile
 }
-trap cleanup EXIT
-trap 'echo "interrupted"; exit 130' INT TERM
+trap cleanup EXIT INT TERM
+
+touch /tmp/lockfile
+# ... do work ...
+# on exit (any cause), cleanup runs
 ```
 
-Common conventions: 0 success, 1 generic, 2 misuse, 126 not executable, 127 not found, 128+N killed by signal N.
+## Q39. What are heredocs?
 
----
+**Answer:**
 
-### Q39. Heredocs?
+A heredoc lets you embed a multi-line string in a script.
 
 ```bash
-cat <<EOF > config.yml
-host: $HOST
-port: 5432
+cat > config.yml <<EOF
+host: $(hostname)
+port: 8080
 EOF
 
-# No expansion (literal)
-cat <<'EOF' > script.sh
-echo "$VAR is literal"
+# No expansion (literal): quote the marker
+cat > script.sh <<'EOF'
+echo "$HOME"     # literal, not expanded
 EOF
 
-# Indented (strips leading tabs)
+# Indented (strips leading tabs): use <<-
 cat <<-EOF
 	indented
+	with tabs
 EOF
 ```
 
 ---
 
-## Text Processing
+## 8. Text Processing
 
-### Q40. grep essentials?
+## Q40. What are the essentials of `grep`?
+
+**Answer:**
 
 ```bash
-grep "pattern" file
-grep -i "case insensitive" file
-grep -r "TODO" src/                 # recursive
-grep -rn "TODO" src/                # with line numbers
-grep -v "exclude" file              # invert
-grep -c "pattern" file              # count
-grep -l "pattern" *.log             # files matching
-grep -E "foo|bar" file              # extended regex
-grep -P "\d+" file                  # Perl regex
-grep -A 3 -B 1 "error" log          # context
-grep --color=auto -n "pattern" file
+grep "error" log.txt              # find lines containing "error"
+grep -i "ERROR" log.txt           # case-insensitive
+grep -v "debug" log.txt           # invert: lines NOT containing
+grep -r "TODO" src/               # recursive
+grep -n "panic" log.txt           # show line numbers
+grep -E "warn|error" log.txt      # extended regex (or)
+grep -A 3 -B 2 "error" log.txt    # 3 lines after, 2 before
+grep -c "error" log.txt           # count matches
+grep -l "secret" *.conf           # only filenames
 ```
 
-For huge codebases, use `ripgrep` (`rg`) — faster, respects `.gitignore`.
-
----
-
-### Q41. sed examples?
+Example:
 
 ```bash
-sed 's/old/new/' file               # first per line
-sed 's/old/new/g' file              # all per line
-sed -i 's/old/new/g' file           # in-place
-sed -i.bak 's/old/new/g' file       # in-place with backup
-sed -n '5,10p' file                 # print lines 5-10
-sed '/^#/d' file                    # delete comment lines
-sed 's|/usr/bin|/usr/local/bin|g' file   # alt delimiter
-sed -E 's/[0-9]+/N/g' file          # extended regex
+grep -n "ERROR" /var/log/app.log
+# 142:2025-05-05 10:32:11 ERROR connection refused
+# 188:2025-05-05 10:35:01 ERROR timeout
 ```
 
----
+## Q41. Give me some `sed` examples.
 
-### Q42. awk examples?
+**Answer:**
+
+`sed` is a stream editor — best for in-place text substitution.
 
 ```bash
-awk '{print $1}' file               # first column (whitespace)
-awk -F',' '{print $2}' file.csv     # CSV
-awk '$3 > 100' file                 # rows where col 3 > 100
-awk '{sum += $1} END {print sum}' file
-awk '/error/ {print}' file
-awk 'NR==1 {next} {print}' file     # skip header
+sed 's/foo/bar/' file.txt          # replace first occurrence per line
+sed 's/foo/bar/g' file.txt         # all occurrences
+sed -i 's/foo/bar/g' file.txt      # edit file in place
+sed -i.bak 's/foo/bar/g' file.txt  # in place with backup
 
-# Common one-liner: sum group counts
-awk '{count[$1]++} END {for (k in count) print k, count[k]}' file
+sed -n '10,20p' file.txt           # print lines 10-20
+sed '/^#/d' file.conf              # delete comment lines
+sed '/^$/d' file.txt               # delete empty lines
 ```
 
----
+## Q42. Give me some `awk` examples.
 
-### Q43. Other text tools?
+**Answer:**
+
+`awk` is a small language for column-based text processing. Each line is split into fields ($1, $2, ...).
 
 ```bash
-cut -d',' -f1,3 file.csv
-cut -c1-10 file              # chars 1-10
-sort file                     # sort lines
-sort -n file                  # numeric
-sort -k2,2 file               # by column 2
-sort -u file                  # unique
-uniq                          # only adjacent dups; usually after sort
-sort file | uniq -c | sort -rn  # frequency count
-tr 'a-z' 'A-Z' < file         # uppercase
-tr -d '\r' < winfile          # strip CR
+awk '{print $1, $3}' file.txt              # print columns 1 and 3
+awk -F: '{print $1}' /etc/passwd           # split by ":"; print usernames
+awk '$3 > 100 {print $0}' file.txt         # filter by column value
+awk '{sum+=$1} END {print sum}' nums.txt   # sum first column
+
+# Common one-liner: top 10 IP addresses in a log
+awk '{print $1}' access.log | sort | uniq -c | sort -rn | head
+```
+
+## Q43. What other text tools should I know?
+
+**Answer:**
+
+```bash
+sort file.txt              # alphabetical
+sort -n file.txt           # numeric
+sort -u file.txt           # remove duplicates
+uniq                       # remove ADJACENT duplicates (sort first)
+uniq -c                    # count duplicates
+cut -d',' -f1,3 data.csv   # columns 1 and 3 of CSV
+tr 'a-z' 'A-Z' < file      # transliterate (lowercase to upper)
+wc -l file                 # count lines
 head -n 20 file
 tail -n 20 file
-tail -f file                  # follow
-wc -l file                    # line count
+tail -f log                # follow new lines
 ```
 
----
+## Q44. Give me a pipe example: top 10 IPs in an access log.
 
-### Q44. Pipe example: top 10 IPs in access log?
+**Answer:**
 
 ```bash
-awk '{print $1}' access.log \
+awk '{print $1}' /var/log/nginx/access.log \
   | sort \
   | uniq -c \
   | sort -rn \
   | head -10
 ```
 
----
+Expected output:
 
-## File Operations
-
-### Q45. find examples?
-
-```bash
-find . -name "*.log"
-find . -iname "*.LOG"                # case-insensitive
-find /var/log -type f -mtime +7      # modified > 7 days ago
-find . -size +100M                   # bigger than 100M
-find . -name "*.tmp" -delete
-find . -type f -name "*.sh" -exec chmod +x {} \;
-find . -type f -name "*.txt" -exec grep -l "TODO" {} +
-find . -newer reference.txt
-find . -user alice -group devs
-find . -empty
-find . -maxdepth 2 -type d
+```text
+   142 192.168.1.10
+    98 10.0.0.5
+    87 203.0.113.4
+   ...
 ```
 
-`-exec ... +` batches, much faster than `\;` per-file.
-
 ---
 
-### Q46. find vs locate?
+## 9. File Operations
+
+## Q45. Give me some `find` examples.
 
 **Answer:**
-- `find` — live filesystem scan; accurate, slower.
-- `locate` — queries a precomputed database (`updatedb`); fast but stale.
-
----
-
-### Q47. xargs?
 
 ```bash
-find . -name "*.log" -print0 | xargs -0 rm
-echo "1 2 3" | xargs -n 1 echo
-ls *.txt | xargs -I {} mv {} archive/{}
-xargs -P 4 -I {} curl {} < urls.txt   # parallel, 4 at a time
+find . -name "*.log"                       # by name
+find . -iname "*.LOG"                      # case-insensitive
+find . -type f -size +100M                 # files larger than 100MB
+find . -mtime -7                           # modified in last 7 days
+find /var/log -name "*.log" -mtime +30 -delete   # delete logs older than 30 days
+find . -name "*.tmp" -exec rm {} \;        # exec for each match
+find . -name "*.tmp" -exec rm {} +         # batch (faster)
+find . -type d -empty                      # empty dirs
+find . -user alice                         # by owner
 ```
 
-Always use `-print0` and `-0` to handle filenames with spaces/newlines safely.
+## Q46. find vs locate?
 
----
+**Answer:**
 
-### Q48. Archive and compression?
+`find` searches the filesystem live — slower but always current.
+
+`locate` queries a pre-built database — instant but may be stale. Update the DB with `sudo updatedb`.
+
+```bash
+locate nginx.conf
+sudo updatedb
+```
+
+## Q47. What is `xargs`?
+
+**Answer:**
+
+`xargs` builds command lines from input. Useful when a tool does not accept input piped in.
+
+```bash
+find . -name "*.log" | xargs rm           # but breaks on filenames with spaces
+
+# Better: NUL-terminated
+find . -name "*.log" -print0 | xargs -0 rm
+
+# Run in parallel
+cat urls.txt | xargs -n 1 -P 8 curl -s
+```
+
+## Q48. How do you archive and compress files?
+
+**Answer:**
 
 ```bash
 # tar
-tar -czf out.tar.gz dir/             # create gzip
-tar -cjf out.tar.bz2 dir/            # bzip2
-tar -cJf out.tar.xz dir/             # xz
-tar -tzf out.tar.gz                  # list
-tar -xzf out.tar.gz                  # extract
-tar -xzf out.tar.gz -C /opt          # extract into dir
+tar -czf archive.tar.gz dir/        # create gzip
+tar -cjf archive.tar.bz2 dir/       # bzip2
+tar -cJf archive.tar.xz dir/        # xz
+tar -tzf archive.tar.gz             # list contents
+tar -xzf archive.tar.gz             # extract
+tar -xzf archive.tar.gz -C /tmp     # extract to specific dir
 
 # zip / unzip
-zip -r out.zip dir/
-unzip out.zip
+zip -r archive.zip dir/
+unzip archive.zip
 
 # gzip a single file
-gzip file        # → file.gz
-gunzip file.gz
+gzip file.txt        # creates file.txt.gz, removes original
+gunzip file.txt.gz
 ```
 
 ---
 
-## Package Management
+## 10. Package Management
 
-### Q49. apt vs yum/dnf?
-
-| Action | Debian/Ubuntu (apt) | RHEL/CentOS/Fedora (dnf) |
-|--------|---------------------|--------------------------|
-| Update index | `apt update` | `dnf check-update` |
-| Upgrade all | `apt upgrade` | `dnf upgrade` |
-| Install | `apt install pkg` | `dnf install pkg` |
-| Remove | `apt remove pkg` | `dnf remove pkg` |
-| Purge configs | `apt purge pkg` | n/a |
-| Search | `apt search term` | `dnf search term` |
-| Info | `apt show pkg` | `dnf info pkg` |
-| List installed | `dpkg -l` | `rpm -qa` |
-| File → package | `dpkg -S /path` | `rpm -qf /path` |
-| Package contents | `dpkg -L pkg` | `rpm -ql pkg` |
-
-`yum` is the older RHEL package manager; `dnf` is its modern replacement.
-
----
-
-## Users and Cron
-
-### Q50. User and group management?
-
-```bash
-useradd -m -s /bin/bash alice
-passwd alice
-usermod -aG docker,sudo alice         # add to groups (-a important!)
-groups alice
-id alice
-deluser alice
-groupadd devs
-gpasswd -a alice devs
-```
-
-User info: `/etc/passwd`. Groups: `/etc/group`. Hashed passwords: `/etc/shadow`.
-
----
-
-### Q51. sudo basics?
+## Q49. apt vs yum/dnf — what is the difference?
 
 **Answer:**
-Run commands as another user (default root) per rules in `/etc/sudoers`. Edit only with `visudo`.
 
-```
-# /etc/sudoers.d/devs
-%devs ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart myapp
-alice ALL=(ALL:ALL) ALL
-```
+- **apt** is used on Debian and Ubuntu.
+- **yum** is the older RHEL/CentOS package manager. **dnf** is its modern replacement.
 
 ```bash
-sudo -u postgres psql
-sudo -i                   # root shell
-sudo -E cmd               # preserve env
+# Debian/Ubuntu
+sudo apt update
+sudo apt install nginx
+sudo apt upgrade
+sudo apt remove nginx
+sudo apt list --installed
+apt search keyword
+
+# RHEL/Fedora
+sudo dnf install nginx
+sudo dnf update
+sudo dnf remove nginx
+sudo dnf list installed
+dnf search keyword
 ```
 
 ---
 
-### Q52. Environment variables and PATH?
+## 11. Users and Cron
+
+## Q50. How do you manage users and groups?
+
+**Answer:**
 
 ```bash
-echo $PATH
-export FOO=bar             # export to children
-unset FOO
-env                        # show all
-printenv FOO
+sudo useradd -m -s /bin/bash alice    # create user with home, bash shell
+sudo passwd alice                     # set password
+sudo userdel -r alice                 # delete user and home
+
+sudo groupadd devs
+sudo usermod -aG devs alice           # add to group (-a is critical to APPEND)
+groups alice                          # show alice's groups
+id alice                              # uid, gid, groups
+```
+
+## Q51. What are the basics of `sudo`?
+
+**Answer:**
+
+`sudo` lets a user run a command as another user (usually root). Privilege rules live in `/etc/sudoers`. Edit only via `visudo` to avoid syntax errors that lock you out.
+
+```bash
+sudo visudo                  # safely edit sudoers
+sudo -l                      # what can I run with sudo?
+sudo -u alice command        # run as alice
+sudo -i                      # full root login shell
+```
+
+Drop-in files in `/etc/sudoers.d/` are preferred for additions:
+
+```text
+# /etc/sudoers.d/devs
+%devs ALL=(ALL) NOPASSWD: /bin/systemctl restart myapp
+```
+
+## Q52. How do environment variables and PATH work?
+
+**Answer:**
+
+```bash
+echo "$PATH"                              # search path for executables
+export FOO="bar"                          # set for current session and children
+echo "$FOO"
 
 # Persist
 # ~/.bashrc, ~/.profile, /etc/environment, /etc/profile.d/*.sh
+
+# Add a directory to PATH
+export PATH="$HOME/bin:$PATH"
+
+env                                       # show all environment variables
+printenv FOO
 ```
 
-`PATH` is colon-separated. `which cmd` finds first match; `type cmd` shows aliases/functions too.
+`/etc/environment` is read by PAM at login; use it for system-wide vars. `/etc/profile.d/*.sh` is sourced by login shells.
 
----
+## Q53. What is cron syntax?
 
-### Q53. cron syntax?
+**Answer:**
 
-```
-# m h dom mon dow  command
-*/5 * * * *  /usr/local/bin/check.sh   # every 5 min
-0 2 * * *    /opt/backup.sh            # daily 02:00
-0 0 1 * *    /opt/monthly.sh           # monthly
-@reboot      /opt/init.sh
+cron schedules periodic jobs. Each line in a crontab has five time fields plus a command.
+
+```text
+m h dom mon dow  command
+* * * * *        every minute
+0 * * * *        top of every hour
+0 2 * * *        2:00 AM every day
+*/15 * * * *     every 15 minutes
+0 0 * * 0        midnight every Sunday
+0 9 1 * *        9:00 AM on the 1st of each month
 ```
 
 ```bash
-crontab -e            # edit user crontab
-crontab -l            # list
-crontab -r            # remove
+crontab -e         # edit your user's crontab
+crontab -l         # show
+sudo crontab -e -u www-data    # edit another user's crontab
 ```
 
-System cron: `/etc/crontab` and `/etc/cron.{hourly,daily,weekly,monthly}`. Cron has minimal env — set `PATH` and use absolute paths. Capture errors:
+System cron lives in `/etc/cron.d/`, `/etc/cron.daily/`, etc.
 
-```
-0 2 * * * /opt/backup.sh >> /var/log/backup.log 2>&1
-```
+## Q54. What is `logrotate`?
 
----
+**Answer:**
 
-### Q54. logrotate?
+`logrotate` rotates, compresses, and prunes log files so they do not fill up disks. It runs daily via cron or a systemd timer.
 
-```
+```text
 # /etc/logrotate.d/myapp
 /var/log/myapp/*.log {
-  daily
-  rotate 14
-  missingok
-  notifempty
-  compress
-  delaycompress
-  copytruncate
-  postrotate
-    systemctl reload myapp >/dev/null 2>&1 || true
-  endscript
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 myapp myapp
+    postrotate
+        systemctl reload myapp >/dev/null 2>&1 || true
+    endscript
 }
 ```
 
-Test: `logrotate -d /etc/logrotate.d/myapp` (dry run).
-
----
-
-## Monitoring and Troubleshooting
-
-### Q55. CPU diagnostics?
-
 ```bash
-top                        # interactive
-htop                       # better
-uptime                     # load averages
-vmstat 1 5                 # 5 samples, 1s apart
-mpstat -P ALL 1            # per-CPU
-pidstat 1                  # per-process
+sudo logrotate -d /etc/logrotate.d/myapp     # dry run
+sudo logrotate -f /etc/logrotate.d/myapp     # force run
 ```
 
-**Load average** — runnable + uninterruptible processes averaged over 1/5/15 min. > number of cores = saturation.
-
 ---
 
-### Q56. Memory diagnostics?
+## 12. Monitoring and Troubleshooting
+
+## Q55. How do you diagnose CPU issues?
+
+**Answer:**
+
+```bash
+top                # interactive
+htop               # nicer
+uptime             # load averages over 1/5/15 min
+mpstat -P ALL 1    # per-CPU usage (sysstat package)
+pidstat 1          # per-process CPU usage
+vmstat 1           # processes, memory, IO, CPU
+```
+
+A "load average" higher than the number of CPUs means more processes are waiting than your CPUs can serve.
+
+## Q56. How do you diagnose memory issues?
+
+**Answer:**
+
+```bash
+free -h            # quick summary
+                   #               total  used  free  shared  buff/cache  available
+                   # Mem:           7.7Gi 2.0Gi  3.2Gi 100Mi   2.5Gi       5.4Gi
+vmstat 1
+ps aux --sort=-%mem | head
+cat /proc/meminfo
+```
+
+Pay attention to "available" rather than "free" — Linux uses free RAM for cache and reclaims it as needed.
+
+## Q57. How do you diagnose disk issues?
+
+**Answer:**
+
+```bash
+df -h                         # filesystem usage
+df -i                         # inode usage
+du -sh /var/*                 # sizes of subdirectories
+du -h --max-depth=1 / 2>/dev/null | sort -h
+iostat -xz 1                  # I/O stats per device
+iotop                         # interactive I/O per process
+ncdu /                        # interactive disk usage explorer
+lsblk                         # block devices
+```
+
+## Q58. `df` shows space but I get "No space left on device". Why?
+
+**Answer:**
+
+Two common causes:
+
+1. **Inodes are exhausted.** Tons of tiny files have used up all inodes. Check with `df -i`.
+2. **Open deleted files.** A process is still holding a file that has been deleted from the filesystem; the disk space is not freed until the process closes the file.
+
+```bash
+df -i                                       # check inodes
+sudo lsof +L1                               # files with link count 0 (deleted but open)
+sudo lsof | grep deleted | head
+```
+
+Restarting the holding process releases the space.
+
+## Q59. The system is under high load — how do you investigate?
+
+**Answer:**
+
+```bash
+uptime                                  # load averages
+top  -o %CPU                            # by CPU
+top  -o %MEM                            # by memory
+ps auxf --sort=-%cpu | head             # top CPU users
+vmstat 1                                # context switches, run queue
+iostat -xz 1                            # disk wait
+ss -s                                   # socket summary
+dmesg -T | tail                         # kernel messages
+```
+
+Decide whether the bottleneck is CPU, memory, disk, or network, then drill down with the appropriate tool.
+
+## Q60. How do you diagnose an out-of-memory situation?
+
+**Answer:**
 
 ```bash
 free -h
-cat /proc/meminfo
-ps aux --sort=-%mem | head
-smem -tk                   # better breakdown (PSS, USS)
-slabtop                    # kernel slab allocator
-```
-
-`free` shows `available` — what apps can use without swapping. `buff/cache` is reclaimable.
-
----
-
-### Q57. Disk diagnostics?
-
-```bash
-df -h                      # filesystem usage
-df -i                      # inodes
-du -sh *                   # per-entry size
-du -h --max-depth=1 /var | sort -h
-ncdu /                     # interactive
-iostat -xz 1               # per-device I/O
-iotop                      # per-process I/O
-lsblk
-mount | column -t
-```
-
----
-
-### Q58. "No space left on device" but `df` shows space?
-
-**Answer:** Usually inodes are exhausted.
-```bash
-df -i
-find / -xdev -type f | awk -F/ '{print $2}' | sort | uniq -c | sort -rn | head
-```
-
-Common culprit: millions of files under `/var/lib/docker`, `/tmp`, or session stores.
-
----
-
-### Q59. High load — how to investigate?
-
-1. `uptime` — load averages.
-2. `top -o %CPU` and `top -o %MEM`.
-3. `vmstat 1` — `r` column = runnable processes; `b` = blocked on I/O; `wa` = % time waiting on I/O.
-4. `iostat -xz 1` — `%util` close to 100 means disk-bound.
-5. `pidstat -d 1` — per-process I/O.
-6. `dmesg -T | tail` — OOM killer? hardware errors?
-7. `journalctl -p err -S "1 hour ago"`.
-
----
-
-### Q60. Out of memory — diagnosis?
-
-```bash
-dmesg -T | grep -i "out of memory"
-journalctl -k | grep -i oom
+dmesg -T | grep -i "killed process"      # OOM killer victims
+journalctl -k | grep -i "out of memory"
 ps aux --sort=-%mem | head
 ```
 
-OOM killer logs which process was killed. Set `vm.overcommit_memory`, `cgroup` limits, or swap appropriately.
+The Linux OOM killer terminates a process when memory is exhausted. The `oom_score` of each process determines the victim.
 
----
+## Q61. What is a network troubleshooting checklist?
 
-### Q61. Network troubleshooting checklist?
+**Answer:**
 
-1. **DNS** — `dig host`, `getent hosts host`.
-2. **Reachability** — `ping`, `traceroute`, `mtr`.
-3. **Port** — `nc -zv host port`, `ss -tulpn`.
-4. **TLS** — `openssl s_client -connect host:443 -servername host`.
-5. **HTTP** — `curl -v`, `curl -w "%{http_code} %{time_total}\n"`.
-6. **Local firewall** — `iptables -L -n -v`, `ufw status`.
-7. **Cloud security groups** / NACLs.
-8. **Routing** — `ip route get target`.
-9. **Packet capture** — `tcpdump -i any -nn port 443 -w out.pcap`.
+1. Local interface up? `ip -br link`
+2. IP assigned? `ip -br addr`
+3. Default route? `ip route`
+4. DNS works? `dig example.com`
+5. Reach the host? `ping example.com`
+6. Reach the port? `nc -vz example.com 443`
+7. HTTP layer OK? `curl -v https://example.com`
+8. Firewall? `sudo iptables -L -n` or `sudo ufw status`
 
----
+## Q62. What are the common log locations?
 
-### Q62. Common log locations?
+**Answer:**
 
-| Log | Path |
-|-----|------|
-| Auth | `/var/log/auth.log` (Debian), `/var/log/secure` (RHEL) |
-| Kernel | `/var/log/kern.log`, `dmesg` |
-| Syslog | `/var/log/syslog`, `/var/log/messages` |
-| systemd | `journalctl -u <unit>` |
-| Web | `/var/log/nginx/`, `/var/log/apache2/` |
-| Cron | `/var/log/cron`, `journalctl -u cron` |
-| Boot | `/var/log/boot.log`, `journalctl -b` |
+| Log                    | Path                              |
+| ---------------------- | --------------------------------- |
+| Authentication / sudo  | `/var/log/auth.log` (Debian) or `/var/log/secure` (RHEL) |
+| Kernel                 | `/var/log/kern.log` or `dmesg`    |
+| System / general       | `/var/log/syslog` or `/var/log/messages` |
+| Nginx                  | `/var/log/nginx/`                 |
+| Apache                 | `/var/log/apache2/`               |
+| Mail                   | `/var/log/mail.log`               |
+| Boot                   | `/var/log/boot.log`               |
 
-Always tail with `journalctl -f` or `tail -F` (capital F handles rotation).
+On systemd-based systems, prefer `journalctl`.
 
----
+## Q63. How do you tune kernel parameters?
 
-### Q63. Kernel parameters tuning?
+**Answer:**
+
+Kernel parameters live under `/proc/sys` and are configured with `sysctl`.
 
 ```bash
 # View
-sysctl net.core.somaxconn
-cat /proc/sys/net/core/somaxconn
+sysctl net.ipv4.ip_forward
+cat /proc/sys/net/ipv4/ip_forward
 
 # Temporary
-sysctl -w net.core.somaxconn=4096
+sudo sysctl -w net.ipv4.ip_forward=1
 
 # Persist
-echo "net.core.somaxconn=4096" >> /etc/sysctl.d/99-tune.conf
-sysctl --system
+echo "net.ipv4.ip_forward = 1" | sudo tee /etc/sysctl.d/99-custom.conf
+sudo sysctl --system
 ```
 
-Common production tunables: `net.core.somaxconn`, `net.ipv4.tcp_tw_reuse`, `vm.swappiness`, `fs.file-max`, `net.ipv4.ip_local_port_range`.
+Common knobs: `vm.swappiness`, `net.core.somaxconn`, `net.ipv4.tcp_tw_reuse`, `fs.file-max`.
 
----
+## Q64. What is `ulimit` and why does it matter?
 
-### Q64. `ulimit` and resource limits?
+**Answer:**
+
+`ulimit` shows or sets per-process resource limits, such as the max number of open file descriptors. Many production issues ("Too many open files") come from default limits.
 
 ```bash
-ulimit -a            # current
-ulimit -n            # open files (default often 1024)
-ulimit -n 65536      # raise for current shell
+ulimit -a               # show all
+ulimit -n               # max open files (often 1024 default)
+ulimit -n 65535         # raise for current session
+
+# Persistent system limits
+# /etc/security/limits.conf
+# myapp soft nofile 65535
+# myapp hard nofile 65535
+
+# For systemd services, set in the unit:
+# LimitNOFILE=65535
 ```
 
-Persist in `/etc/security/limits.conf`:
-```
-*       soft    nofile  65536
-*       hard    nofile  65536
-```
+## Q65. What is a sensible Linux production checklist?
 
-For systemd units, set `LimitNOFILE=` in the `[Service]` section.
+**Answer:**
 
----
-
-### Q65. Senior-level production checklist?
-
-- [ ] Time sync (chronyd/ntpd) running.
-- [ ] Logs rotated, persisted, and shipped to central store.
-- [ ] Monitoring (CPU, mem, disk, net, app metrics) and alerts.
-- [ ] SSH hardened — keys only, no root login, fail2ban.
-- [ ] Firewall configured.
-- [ ] Unattended security upgrades.
-- [ ] Backup and tested restore procedure.
-- [ ] Regular CVE patching cycle.
-- [ ] Resource limits per service.
-- [ ] systemd unit with `Restart=` and proper user.
-- [ ] Health checks and runbooks.
-- [ ] Configuration in version control (Ansible/Terraform/Chef).
+- SSH: key auth only, root login disabled, fail2ban or similar.
+- Firewall configured (`ufw` / `nftables`).
+- Automatic security updates enabled.
+- Time synced via `chrony` or `systemd-timesyncd`.
+- Logs rotating with `logrotate`; journald disk usage capped.
+- Application as a non-root user with a tight systemd unit.
+- Backups of `/etc`, application data, and databases — tested.
+- Monitoring: load, memory, disk, log errors.
+- `ulimit -n` raised for high-traffic services.
+- Swap configured appropriately for the workload.

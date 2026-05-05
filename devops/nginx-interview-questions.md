@@ -1,435 +1,447 @@
 # Nginx Interview Questions
 
-**Level:** Mid to Senior
-**Topics:** Architecture, Reverse Proxy, Load Balancing, TLS, Caching, Rate Limiting, Security, Performance Tuning
+A practical, teaching-style Q&A guide for Nginx. Each question gives a plain-language explanation followed by a working configuration block you can drop into a real server.
 
 ---
 
 ## Table of Contents
 
-1. [Fundamentals](#fundamentals)
-2. [Configuration Structure](#configuration-structure)
-3. [Reverse Proxy](#reverse-proxy)
-4. [Load Balancing](#load-balancing)
-5. [SSL/TLS and HTTP/2 / HTTP/3](#ssltls-and-http2--http3)
-6. [Caching](#caching)
-7. [Rate Limiting and Compression](#rate-limiting-and-compression)
-8. [Static Files, FastCGI, WebSockets](#static-files-fastcgi-websockets)
-9. [Locations, Rewrites, and Headers](#locations-rewrites-and-headers)
-10. [Security](#security)
-11. [Performance Tuning](#performance-tuning)
-12. [Operations and Debugging](#operations-and-debugging)
+1. Fundamentals
+2. Configuration Structure
+3. Reverse Proxy
+4. Load Balancing
+5. SSL/TLS and HTTP/2 / HTTP/3
+6. Caching
+7. Rate Limiting and Compression
+8. Static Files, FastCGI, WebSockets
+9. Locations, Rewrites, and Headers
+10. Security
+11. Performance Tuning
+12. Operations and Debugging
 
 ---
 
-## Fundamentals
+## 1. Fundamentals
 
-### Q1. What is Nginx?
+## Q1. What is Nginx?
 
 **Answer:**
-A high-performance HTTP server, reverse proxy, load balancer, and TCP/UDP proxy. Known for its event-driven, asynchronous architecture that handles tens of thousands of concurrent connections with low memory.
 
----
+Nginx is a high-performance HTTP server, reverse proxy, load balancer, and TLS terminator. It is widely used in front of application servers (Node, PHP-FPM, Python, Java) to serve static files, terminate HTTPS, route requests, cache responses, and limit abusive traffic.
 
-### Q2. Nginx vs Apache?
+```bash
+nginx -v
+# nginx version: nginx/1.27.0
 
-| Aspect | Nginx | Apache |
-|--------|-------|--------|
-| Architecture | Event-driven, async | Process/thread per connection |
-| Concurrency | Excellent (C10K+) | Lower without `event` MPM |
-| Static files | Very fast | Fast |
-| Dynamic content | Via FastCGI/upstream | mod_php, etc. embedded |
-| Config | Block-based | `.htaccess`, directives |
-| `.htaccess` | No (better perf) | Yes |
-| Modules | Compile-time mostly | Loadable at runtime |
+sudo systemctl status nginx
+```
 
-Nginx is typically the front edge; Apache is fine as an app server.
-
----
-
-### Q3. Nginx architecture?
+## Q2. What is the difference between Nginx and Apache?
 
 **Answer:**
-- **Master process** — reads config, manages workers, binds ports.
-- **Worker processes** — handle connections; one per CPU core typically.
-- **Event-driven loop** — uses `epoll` (Linux), `kqueue` (BSD/macOS) — non-blocking I/O.
 
-A single worker handles thousands of connections via the event loop, instead of one thread per connection.
+| Aspect          | Nginx                          | Apache (httpd)                 |
+| --------------- | ------------------------------ | ------------------------------ |
+| Architecture    | Event-driven, async            | Process / thread per connection |
+| Static files    | Very fast                      | Fast                           |
+| Concurrency     | Tens of thousands easily       | Heavier per connection         |
+| Configuration   | One nginx.conf + includes      | `.htaccess` + httpd.conf       |
+| Modules         | Compiled in (or dynamic since 1.9) | Loaded at runtime          |
 
----
+For high-traffic, static-file-heavy, or reverse-proxy workloads, Nginx is the common choice.
 
-### Q4. Why is Nginx so fast?
+## Q3. What is Nginx's architecture?
 
 **Answer:**
-1. Async event-driven model.
-2. Non-blocking I/O.
-3. Efficient memory use (small per-connection footprint).
-4. `sendfile()` zero-copy for static files.
-5. Fixed worker pool (no fork-per-request).
-6. Optimized C implementation.
+
+Nginx uses an event-driven, asynchronous, non-blocking model. A single **master process** reads the config and manages **worker processes**. Each worker handles thousands of connections in a single OS thread using `epoll` (Linux) or `kqueue` (BSD).
+
+Because workers do not spawn a thread per connection, Nginx scales to many concurrent connections with low memory.
+
+```bash
+ps -ef | grep nginx
+# root      1234   1   0 May04 ?  00:00:00 nginx: master process
+# nginx     1235 1234  0 May04 ?  00:00:00 nginx: worker process
+# nginx     1236 1234  0 May04 ?  00:00:00 nginx: worker process
+```
+
+## Q4. Why is Nginx so fast?
+
+**Answer:**
+
+1. **Event loop**: a worker uses one thread to multiplex thousands of sockets via `epoll`.
+2. **Zero-copy file delivery**: `sendfile()` ships file bytes from disk to network without copying through user space.
+3. **No per-request processes/threads**: avoids context-switch overhead.
+4. **Static-file path is highly optimized.**
+5. **Configurable buffering and caching** to absorb slow clients without blocking workers.
 
 ---
 
-## Configuration Structure
+## 2. Configuration Structure
 
-### Q5. Top-level config blocks?
+## Q5. What are the top-level config blocks?
+
+**Answer:**
 
 ```nginx
 # /etc/nginx/nginx.conf
+
 user www-data;
 worker_processes auto;
-pid /run/nginx.pid;
 
 events {
-  worker_connections 1024;
-  multi_accept on;
-  use epoll;
+    worker_connections 1024;
 }
 
 http {
-  sendfile on;
-  tcp_nopush on;
-  tcp_nodelay on;
-  keepalive_timeout 65;
-  include /etc/nginx/mime.types;
-  default_type application/octet-stream;
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
 
-  include /etc/nginx/conf.d/*.conf;
-  include /etc/nginx/sites-enabled/*;
+    sendfile      on;
+    tcp_nopush    on;
+    keepalive_timeout 65;
+
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
 }
 ```
 
-Hierarchy: `main` → `events`, `http` → `server` → `location`. Nginx also supports `stream {}` for TCP/UDP proxying and `mail {}`.
+Key directives sit in three contexts: top level (main), `events`, and `http`. Inside `http` you have `server` (virtual hosts) and inside `server` you have `location` blocks.
 
----
+## Q6. Show me a server block (virtual host) example.
 
-### Q6. Server block (virtual host) example?
+**Answer:**
 
 ```nginx
 server {
-  listen 80;
-  listen [::]:80;
-  server_name example.com www.example.com;
-  root /var/www/example;
-  index index.html;
+    listen 80;
+    server_name example.com www.example.com;
 
-  location / {
-    try_files $uri $uri/ =404;
-  }
+    root /var/www/example;
+    index index.html;
 
-  access_log /var/log/nginx/example.access.log;
-  error_log  /var/log/nginx/example.error.log warn;
+    access_log /var/log/nginx/example.access.log;
+    error_log  /var/log/nginx/example.error.log warn;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
 }
 ```
 
-Multiple server blocks share a port — the `Host` header chooses the match. The first listed block matching the listen address is the "default" if no `server_name` matches.
+`try_files` checks for a literal file, then a directory index, then returns 404.
 
----
-
-### Q7. How does Nginx select a server block?
+## Q7. How does Nginx select which server block to use?
 
 **Answer:**
-1. Match `listen` directive (IP:port).
-2. Match `server_name` (exact > leading wildcard `*.example.com` > trailing wildcard `mail.*` > regex).
-3. Otherwise, default server (first block on that listen, or one with `default_server`).
 
-```nginx
-listen 443 ssl default_server;
-```
+Nginx matches a request to a server block by:
 
----
+1. **`listen` directive** — does the request's IP and port match?
+2. **`server_name` directive** — does the request's `Host` header match?
 
-## Reverse Proxy
-
-### Q8. Reverse proxy basics?
+If multiple server blocks listen on the same port, Nginx picks one in this order: exact name match, leading wildcard (`*.example.com`), trailing wildcard (`mail.*`), regex, then the **default_server**.
 
 ```nginx
 server {
-  listen 80;
-  server_name api.example.com;
-
-  location / {
-    proxy_pass http://127.0.0.1:3000;
-    proxy_http_version 1.1;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host  $host;
-
-    proxy_connect_timeout 5s;
-    proxy_read_timeout    60s;
-    proxy_send_timeout    60s;
-  }
+    listen 80 default_server;
+    server_name _;
+    return 444;        # close connection if no Host matches
 }
 ```
 
 ---
 
-### Q9. Why use Nginx as a reverse proxy?
+## 3. Reverse Proxy
+
+## Q8. What are the basics of a reverse proxy?
 
 **Answer:**
-- **TLS termination** — offload crypto from app.
-- **Load balancing** — distribute across upstreams.
-- **Caching** — reduce backend load.
-- **Rate limiting** — protect backend.
-- **Static file serving** — faster than most app servers.
-- **Compression** — gzip/brotli.
-- **Security** — WAF features, hide backend, header policies.
-- **Header manipulation**.
-- **HTTP/2 and HTTP/3** at the edge while backend stays HTTP/1.1.
 
----
-
-### Q10. `proxy_pass` with vs without trailing slash?
-
-**Answer:**
+A reverse proxy sits between clients and your application. The client connects to Nginx; Nginx forwards the request to your backend (Node, PHP-FPM, Python, etc.) and returns the response. The client never talks to the backend directly.
 
 ```nginx
-location /api/ {
-  proxy_pass http://backend/;        # request /api/users → backend /users
-}
+server {
+    listen 80;
+    server_name api.example.com;
 
-location /api/ {
-  proxy_pass http://backend;         # request /api/users → backend /api/users
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 }
 ```
 
-- Trailing slash on `proxy_pass` URI replaces the matched location prefix.
-- No URI on `proxy_pass` (just host:port) preserves the full path.
+## Q9. Why use Nginx as a reverse proxy?
 
-A small but common bug source.
+**Answer:**
+
+1. Terminate TLS once, in one place.
+2. Route different paths or subdomains to different backends.
+3. Buffer slow clients so they do not tie up backend workers.
+4. Serve static files directly without bothering the app.
+5. Apply rate limits, IP allowlists, and security headers centrally.
+6. Gzip / Brotli compression.
+7. Cache backend responses.
+8. Health checks and load balancing across multiple app instances.
+
+## Q10. What is the difference between `proxy_pass` with and without a trailing slash?
+
+**Answer:**
+
+This trips up many people. The trailing slash on `proxy_pass` changes whether Nginx rewrites the URI.
+
+```nginx
+# Without trailing slash — passes the full URI
+location /api/ {
+    proxy_pass http://backend;
+}
+# /api/users -> http://backend/api/users
+
+# With trailing slash — strips the matched location prefix
+location /api/ {
+    proxy_pass http://backend/;
+}
+# /api/users -> http://backend/users
+```
+
+## Q11. Forward proxy vs reverse proxy?
+
+**Answer:**
+
+| Type           | Whom it serves           | Example                       |
+| -------------- | ------------------------ | ----------------------------- |
+| Forward proxy  | The clients              | A corporate web proxy         |
+| Reverse proxy  | The servers              | Nginx in front of your app    |
+
+A forward proxy hides the client from the internet. A reverse proxy hides the server (backend) from the client.
 
 ---
 
-### Q11. Forward proxy vs reverse proxy?
+## 4. Load Balancing
 
-| | Forward proxy | Reverse proxy |
-|---|---|---|
-| Sits in front of | Clients | Servers |
-| Used by | Clients to reach servers | Servers to receive client traffic |
-| Examples | Squid, corporate proxy | Nginx, HAProxy, Cloudflare |
-| Visible to | Server doesn't see real client | Client doesn't see real server |
+## Q12. What load balancing methods does Nginx offer?
 
----
-
-## Load Balancing
-
-### Q12. Load balancing methods?
+**Answer:**
 
 ```nginx
 upstream backend {
-  # round-robin (default)
-  server 10.0.0.1:3000;
-  server 10.0.0.2:3000;
+    # round-robin (default)
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
 }
 
-upstream backend_lc {
-  least_conn;
-  server 10.0.0.1:3000;
-  server 10.0.0.2:3000;
+upstream backend2 {
+    least_conn;                          # send to least busy
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
 }
 
-upstream backend_iphash {
-  ip_hash;                    # session stickiness
-  server 10.0.0.1:3000;
-  server 10.0.0.2:3000;
+upstream backend3 {
+    ip_hash;                             # sticky by client IP
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
 }
 
-upstream backend_weighted {
-  server 10.0.0.1:3000 weight=3;
-  server 10.0.0.2:3000 weight=1;
-  server 10.0.0.3:3000 backup;     # used only when others fail
-}
-
-upstream backend_hash {
-  hash $request_uri consistent;     # consistent hashing
-  server 10.0.0.1:3000;
-  server 10.0.0.2:3000;
+upstream backend4 {
+    hash $request_uri consistent;        # consistent hash by URI
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
 }
 ```
 
-| Method | Use case |
-|--------|----------|
-| Round-robin | Default; even distribution |
-| `least_conn` | Backends with varying request times |
-| `ip_hash` | Sticky sessions by client IP |
-| `hash $key` | Sticky by arbitrary key (URI, cookie) |
-| `random two least_conn` | Power-of-two-choices, scales well |
-
----
-
-### Q13. Health checks?
+## Q13. How do health checks work in open-source Nginx?
 
 **Answer:**
-- **Open-source Nginx** — passive only:
-  ```nginx
-  upstream backend {
+
+Open-source Nginx uses passive health checks: it marks a backend "unavailable" after `max_fails` failed connections within `fail_timeout`, and avoids it for `fail_timeout` seconds.
+
+```nginx
+upstream backend {
     server 10.0.0.1:3000 max_fails=3 fail_timeout=30s;
     server 10.0.0.2:3000 max_fails=3 fail_timeout=30s;
-  }
-  ```
-  After 3 failures within 30s, the server is marked down and skipped for 30s.
+}
+```
 
-- **Nginx Plus** — active probes (HTTP, TCP) on a dedicated path.
+Active checks (probes the backend even when no traffic is flowing) require Nginx Plus or third-party modules.
 
-For active health checks in OSS Nginx, use third-party modules (`nginx_upstream_check_module`) or rely on a separate health checker.
+## Q14. How do you configure upstream failover?
 
----
+**Answer:**
 
-### Q14. Upstream failover?
+`backup` marks a server as a failover that is only used when all primaries are down.
 
 ```nginx
 upstream backend {
-  server primary.local:3000 max_fails=2 fail_timeout=10s;
-  server secondary.local:3000 backup;
-}
-
-location / {
-  proxy_pass http://backend;
-  proxy_next_upstream error timeout http_502 http_503 http_504;
-  proxy_next_upstream_tries 2;
-  proxy_next_upstream_timeout 10s;
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
+    server 10.0.0.3:3000 backup;
 }
 ```
 
----
-
-### Q15. Sticky sessions?
+## Q15. How do you configure sticky sessions?
 
 **Answer:**
-- `ip_hash` — same client IP → same backend (breaks behind NATs).
-- `hash $cookie_session consistent` — sticky by app cookie.
-- Nginx Plus has cookie-based sticky out of the box.
 
-Better: make backends stateless by storing sessions in Redis/DB.
-
----
-
-## SSL/TLS and HTTP/2 / HTTP/3
-
-### Q16. Basic TLS configuration?
+`ip_hash` ties a client (by source IP) to one backend. Same IP -> same server.
 
 ```nginx
-server {
-  listen 443 ssl http2;
-  listen [::]:443 ssl http2;
-  server_name example.com;
-
-  ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_prefer_server_ciphers off;
-  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-
-  ssl_session_cache shared:SSL:10m;
-  ssl_session_timeout 1d;
-  ssl_session_tickets off;
-
-  ssl_stapling on;
-  ssl_stapling_verify on;
-
-  add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-}
-
-server {
-  listen 80;
-  server_name example.com;
-  return 301 https://$host$request_uri;
+upstream backend {
+    ip_hash;
+    server 10.0.0.1:3000;
+    server 10.0.0.2:3000;
 }
 ```
 
+For real session affinity by cookie (`sticky cookie`), you need Nginx Plus.
+
 ---
 
-### Q17. What is OCSP stapling?
+## 5. SSL/TLS and HTTP/2 / HTTP/3
+
+## Q16. Show me a basic TLS configuration.
 
 **Answer:**
-The server fetches its OCSP response from the CA periodically and serves it in the TLS handshake. Saves the client an extra request to verify the cert isn't revoked, improving handshake latency and privacy.
 
----
-
-### Q18. HTTP/2 vs HTTP/3?
-
-| | HTTP/2 | HTTP/3 |
-|---|---|---|
-| Transport | TCP + TLS | QUIC (UDP) + TLS 1.3 |
-| Multiplexing | Yes (over TCP) | Yes (no head-of-line blocking) |
-| Head-of-line blocking | TCP-level | None |
-| Connection migration | No | Yes (survives IP changes) |
-| TLS | Optional in spec, required in browsers | Mandatory |
-
-HTTP/2: `listen 443 ssl http2;`
-HTTP/3 (Nginx 1.25+):
 ```nginx
-listen 443 ssl;
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers off;
+
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+    }
+}
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    server_name example.com;
+    return 301 https://$host$request_uri;
+}
+```
+
+## Q17. What is OCSP stapling?
+
+**Answer:**
+
+When a browser receives a TLS certificate, it normally checks revocation status by contacting the certificate's CA (OCSP). This is slow and leaks browsing data.
+
+OCSP stapling has Nginx pre-fetch the OCSP response and "staple" it to the TLS handshake. The browser does not need to make an extra round-trip.
+
+```nginx
+ssl_stapling on;
+ssl_stapling_verify on;
+ssl_trusted_certificate /etc/letsencrypt/live/example.com/chain.pem;
+resolver 1.1.1.1 8.8.8.8 valid=300s;
+resolver_timeout 5s;
+```
+
+## Q18. HTTP/2 vs HTTP/3?
+
+**Answer:**
+
+| Version | Transport | Key features                                                |
+| ------- | --------- | ----------------------------------------------------------- |
+| HTTP/1.1| TCP       | One request at a time per connection (with pipelining gone) |
+| HTTP/2  | TCP + TLS | Multiplexed streams, header compression                     |
+| HTTP/3  | UDP (QUIC)| No head-of-line blocking, faster handshake                  |
+
+Enable HTTP/2:
+
+```nginx
+listen 443 ssl http2;
+```
+
+Enable HTTP/3 (Nginx 1.25+):
+
+```nginx
+listen 443 ssl http2;
 listen 443 quic reuseport;
-http2 on;
 http3 on;
-add_header Alt-Svc 'h3=":443"; ma=86400' always;
+add_header Alt-Svc 'h3=":443"; ma=86400';
+```
+
+## Q19. Why use TLS 1.3?
+
+**Answer:**
+
+TLS 1.3 has fewer round-trips during the handshake (1-RTT, with 0-RTT for resumed sessions), removes outdated cipher suites, and provides forward secrecy by default. Faster and more secure than 1.2.
+
+```nginx
+ssl_protocols TLSv1.2 TLSv1.3;
 ```
 
 ---
 
-### Q19. Why TLS 1.3?
+## 6. Caching
+
+## Q20. Show me a `proxy_cache` configuration.
 
 **Answer:**
-- 1-RTT handshake (vs 2-RTT in TLS 1.2); 0-RTT for resumption.
-- Removed weak ciphers (RC4, CBC modes, SHA-1).
-- Forward secrecy mandatory.
-- Encrypted handshake messages.
-
-Disable TLS 1.0/1.1 — they're insecure.
-
----
-
-## Caching
-
-### Q20. proxy_cache configuration?
 
 ```nginx
 http {
-  proxy_cache_path /var/cache/nginx levels=1:2 keys_zone=mycache:100m
-                   max_size=10g inactive=60m use_temp_path=off;
+    proxy_cache_path /var/cache/nginx
+        levels=1:2
+        keys_zone=app_cache:10m
+        max_size=1g
+        inactive=60m
+        use_temp_path=off;
 
-  proxy_cache_key "$scheme$request_method$host$request_uri";
+    server {
+        location / {
+            proxy_pass http://backend;
+            proxy_cache app_cache;
+            proxy_cache_valid 200 302 10m;
+            proxy_cache_valid 404 1m;
+            proxy_cache_use_stale error timeout updating http_500 http_502 http_503;
+            proxy_cache_lock on;
 
-  server {
-    location / {
-      proxy_cache mycache;
-      proxy_cache_valid 200 302 10m;
-      proxy_cache_valid 404 1m;
-      proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-      proxy_cache_background_update on;
-      proxy_cache_lock on;
-      add_header X-Cache-Status $upstream_cache_status;
-
-      proxy_pass http://backend;
+            add_header X-Cache-Status $upstream_cache_status;
+        }
     }
-  }
 }
 ```
 
-`$upstream_cache_status` values: `MISS`, `HIT`, `EXPIRED`, `BYPASS`, `STALE`, `UPDATING`, `REVALIDATED`.
+`X-Cache-Status` shows MISS, HIT, EXPIRED, BYPASS, etc. — useful for debugging.
 
----
-
-### Q21. Cache invalidation strategies?
+## Q21. What are common cache invalidation strategies?
 
 **Answer:**
-- **TTL-based** — `proxy_cache_valid` with appropriate expiry.
-- **Bypass on cookies** — don't cache responses for logged-in users:
-  ```nginx
-  proxy_cache_bypass $cookie_session;
-  proxy_no_cache     $cookie_session;
-  ```
-- **PURGE module** (Nginx Plus or `ngx_cache_purge`) — explicit invalidation.
-- **Versioned URLs** — change asset URLs (`app.abc123.js`) on deploy.
-- **`Cache-Control` headers** — backend controls cacheability.
 
----
+1. **Time-based**: short TTL via `proxy_cache_valid`.
+2. **`Cache-Control` from origin**: app sets `Cache-Control: max-age=...` and Nginx honors it.
+3. **Cache key includes a version/hash**: deploy a new build under a new URL — old URLs simply age out.
+4. **PURGE module**: open-source `ngx_cache_purge` can delete specific keys.
 
-### Q22. Open file cache?
+```nginx
+proxy_cache_bypass $http_pragma $arg_nocache;     # skip cache when client says so
+proxy_no_cache $cookie_session;                   # do not cache logged-in users
+```
+
+## Q22. What is `open_file_cache`?
+
+**Answer:**
+
+When serving static files, Nginx looks up file metadata (size, mtime, existence) on every request. `open_file_cache` keeps that metadata in memory.
 
 ```nginx
 open_file_cache          max=10000 inactive=60s;
@@ -438,634 +450,654 @@ open_file_cache_min_uses 2;
 open_file_cache_errors   on;
 ```
 
-Caches file descriptors and metadata — big win for static-heavy sites.
+A measurable performance win for static-heavy sites.
 
 ---
 
-## Rate Limiting and Compression
+## 7. Rate Limiting and Compression
 
-### Q23. Rate limiting?
+## Q23. How do you configure rate limiting?
+
+**Answer:**
+
+Define a limit zone in `http`, then use it in a `location`.
 
 ```nginx
 http {
-  limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-  limit_conn_zone $binary_remote_addr zone=conn:10m;
+    # 10 requests per second per IP, with bursts up to 20
+    limit_req_zone $binary_remote_addr zone=api_rl:10m rate=10r/s;
 
-  server {
-    location /api/ {
-      limit_req zone=api burst=20 nodelay;
-      limit_conn conn 10;
-      limit_req_status 429;
-      limit_conn_status 429;
+    # 20 simultaneous connections per IP
+    limit_conn_zone $binary_remote_addr zone=conn_zone:10m;
 
-      proxy_pass http://backend;
+    server {
+        location /api/ {
+            limit_req  zone=api_rl burst=20 nodelay;
+            limit_conn conn_zone 20;
+            proxy_pass http://backend;
+        }
     }
-  }
 }
 ```
 
-- `rate=10r/s` — token bucket at 10 requests/second per IP.
-- `burst=20` — allow burst of 20 above the rate.
-- `nodelay` — process burst immediately (otherwise queued/throttled).
-- `$binary_remote_addr` — uses 4 bytes (IPv4) instead of string (saves memory).
+`burst=20 nodelay` allows quick bursts without delay. Without `nodelay`, requests above the rate are queued and served later.
 
----
+## Q24. How do you configure compression?
 
-### Q24. Compression?
+**Answer:**
 
 ```nginx
 gzip on;
 gzip_vary on;
+gzip_min_length 1024;
 gzip_proxied any;
 gzip_comp_level 5;
-gzip_min_length 1024;
 gzip_types
-  text/plain text/css application/json application/javascript
-  text/xml application/xml application/xml+rss text/javascript
-  image/svg+xml font/ttf font/otf;
+    text/plain
+    text/css
+    text/javascript
+    application/javascript
+    application/json
+    application/xml
+    image/svg+xml;
+```
 
-# Brotli (requires module)
+For Brotli (smaller than gzip on text), build Nginx with the Brotli module:
+
+```nginx
 brotli on;
 brotli_comp_level 5;
-brotli_types text/plain text/css application/json application/javascript image/svg+xml;
+brotli_types text/plain text/css application/javascript application/json image/svg+xml;
 ```
-
-Don't compress already-compressed assets (jpg, png, mp4, woff2). Pre-compress assets at build time and serve with `gzip_static on;` or `brotli_static on;`.
 
 ---
 
-## Static Files, FastCGI, WebSockets
+## 8. Static Files, FastCGI, WebSockets
 
-### Q25. Static files?
+## Q25. Show me a static-files configuration.
+
+**Answer:**
 
 ```nginx
 server {
-  listen 80;
-  root /var/www/site;
-  index index.html;
+    listen 80;
+    server_name static.example.com;
+    root /var/www/static;
 
-  location / {
-    try_files $uri $uri/ /index.html;
-  }
+    location / {
+        try_files $uri $uri/ =404;
+    }
 
-  location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2)$ {
-    expires 1y;
-    add_header Cache-Control "public, immutable";
-    access_log off;
-  }
+    # Long cache for fingerprinted assets
+    location ~* \.(?:css|js|woff2|png|jpg|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
 }
 ```
 
-`try_files` is essential for SPAs — falls back to `index.html` for client-side routes.
+## Q26. How do you serve PHP via FastCGI (PHP-FPM)?
 
----
-
-### Q26. PHP via FastCGI (PHP-FPM)?
+**Answer:**
 
 ```nginx
 server {
-  listen 80;
-  server_name app.local;
-  root /var/www/app/public;
-  index index.php;
+    listen 80;
+    server_name example.com;
+    root /var/www/example/public;
+    index index.php;
 
-  location / {
-    try_files $uri $uri/ /index.php?$query_string;
-  }
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
 
-  location ~ \.php$ {
-    include fastcgi_params;
-    fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-    fastcgi_buffer_size 16k;
-    fastcgi_buffers 4 16k;
-  }
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_index index.php;
+    }
 
-  location ~ /\.ht { deny all; }
+    location ~ /\.(ht|git) {
+        deny all;
+    }
 }
 ```
 
----
+## Q27. How do you proxy WebSockets?
 
-### Q27. WebSocket proxying?
+**Answer:**
+
+WebSockets need HTTP/1.1 with the `Upgrade` header preserved.
 
 ```nginx
 location /ws/ {
-  proxy_pass http://backend;
-  proxy_http_version 1.1;
-  proxy_set_header Upgrade $http_upgrade;
-  proxy_set_header Connection "upgrade";
-  proxy_set_header Host $host;
-  proxy_read_timeout 3600s;          # long-lived
-  proxy_send_timeout 3600s;
+    proxy_pass http://backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade    $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host       $host;
+    proxy_read_timeout 3600s;
+    proxy_send_timeout 3600s;
 }
 ```
 
-Without `Upgrade`/`Connection` headers, the WebSocket handshake fails.
+The long timeouts allow long-lived connections.
 
----
+## Q28. How do you keep connections alive to the upstream?
 
-### Q28. Keep-alive to upstream?
+**Answer:**
+
+By default Nginx opens a new TCP connection to the upstream for each request. With `keepalive`, it pools connections, which reduces latency and load.
 
 ```nginx
 upstream backend {
-  server 10.0.0.1:3000;
-  keepalive 32;
+    server 10.0.0.1:3000;
+    keepalive 32;
 }
 
 server {
-  location / {
-    proxy_pass http://backend;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-  }
+    location / {
+        proxy_pass http://backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
 }
 ```
 
-Without `Connection ""`, the default `close` header tears down upstream connections per request.
-
 ---
 
-## Locations, Rewrites, and Headers
+## 9. Locations, Rewrites, and Headers
 
-### Q29. Location matching priority?
-
-**Order:**
-1. `=` exact match — highest priority.
-2. `^~` prefix match — if matches, regex skipped.
-3. `~` (case-sensitive) and `~*` (case-insensitive) regex — first match wins.
-4. Plain prefix match — longest one wins.
-
-```nginx
-location = /favicon.ico { ... }   # exact
-location ^~ /images/    { ... }   # prefix, no regex
-location ~* \.(png|jpg)$ { ... }  # case-insensitive regex
-location / { ... }                # catch-all
-```
-
----
-
-### Q30. Rewrites?
-
-```nginx
-# Permanent redirect
-rewrite ^/old/(.*)$ /new/$1 permanent;
-
-# Internal rewrite
-rewrite ^/blog/([0-9]+)/?$ /index.php?post_id=$1 last;
-
-# Redirect via return (preferred for static cases)
-return 301 https://$host$request_uri;
-
-# Rewrite flags
-# last  - re-evaluate locations
-# break - stop in current location
-# redirect - 302
-# permanent - 301
-```
-
-Use `return` for simple redirects — faster than `rewrite`.
-
----
-
-### Q31. Common variables?
-
-| Variable | Meaning |
-|----------|---------|
-| `$host` | `Host` header (or server_name fallback) |
-| `$http_<name>` | Any incoming header |
-| `$remote_addr` | Client IP |
-| `$request_uri` | Full URI with args |
-| `$uri` | Normalized URI (no args) |
-| `$args` / `$query_string` | Query string |
-| `$arg_NAME` | Specific query param |
-| `$scheme` | `http` or `https` |
-| `$request_method` | `GET`, `POST`, etc. |
-| `$cookie_NAME` | Specific cookie |
-| `$server_name` | Matched server_name |
-| `$upstream_addr` | Upstream server used |
-| `$upstream_response_time` | Backend latency |
-| `$request_time` | Total request time |
-
----
-
-### Q32. X-Forwarded-For vs X-Real-IP?
+## Q29. What is the location matching priority?
 
 **Answer:**
-- `X-Real-IP` — single value, the immediate client.
-- `X-Forwarded-For` — comma-separated chain across multiple proxies.
+
+When multiple `location` blocks match, Nginx picks one with this priority:
+
+1. **`= /exact/path`** — exact match (highest priority)
+2. **`^~ /prefix/`** — preferred prefix match (skips regex)
+3. **`~ /regex/` (case-sensitive)** or **`~* /regex/` (case-insensitive)** — first matching regex wins
+4. **`/prefix/`** — longest matching prefix (lowest priority)
 
 ```nginx
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+location = /favicon.ico { log_not_found off; access_log off; }
+location ^~ /static/    { root /var/www; }
+location ~* \.php$      { fastcgi_pass ...; }
+location /              { proxy_pass http://backend; }
 ```
 
-`$proxy_add_x_forwarded_for` appends `$remote_addr` to any incoming `X-Forwarded-For`. Only trust these from known proxies (`set_real_ip_from`):
+## Q30. How do rewrites work?
+
+**Answer:**
+
+Rewrites change the URL Nginx is processing. Use them sparingly — `try_files` and `return` are usually clearer.
 
 ```nginx
-set_real_ip_from 10.0.0.0/8;
-real_ip_header X-Forwarded-For;
-real_ip_recursive on;
+# Permanent redirect (301)
+rewrite ^/old/(.*)$ /new/$1 permanent;
+
+# Internal rewrite (the URL doesn't change in the browser)
+rewrite ^/api/v1/(.*)$ /v1/$1 last;
+
+# Redirect via return (preferred for static cases)
+location /old { return 301 /new; }
+location /off { return 410; }            # gone
+
+# Rewrite flags
+# last       re-evaluate locations
+# break      stop in current location
+# redirect   302
+# permanent  301
 ```
 
----
+## Q31. What are some common Nginx variables?
 
-### Q33. Custom error pages?
+**Answer:**
+
+| Variable               | Meaning                                |
+| ---------------------- | -------------------------------------- |
+| `$host`                | Host header (or server_name fallback)  |
+| `$remote_addr`         | Client IP                              |
+| `$request_uri`         | Full original URI with query string    |
+| `$uri`                 | Current (possibly rewritten) URI       |
+| `$args`                | Query string                           |
+| `$scheme`              | http or https                          |
+| `$request_method`      | GET, POST, etc.                        |
+| `$http_user_agent`     | User-Agent header                      |
+| `$http_x_forwarded_for`| X-Forwarded-For header                 |
+| `$server_name`         | The server_name that matched           |
+| `$proxy_add_x_forwarded_for` | Existing XFF + client IP         |
+
+## Q32. What is the difference between X-Forwarded-For and X-Real-IP?
+
+**Answer:**
+
+- `X-Real-IP` is a single value: the immediate client.
+- `X-Forwarded-For` is a comma-separated chain: original client, then each proxy. The first IP is the original client.
+
+```nginx
+proxy_set_header X-Real-IP         $remote_addr;
+proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+The backend should trust these headers only when they come from a known proxy.
+
+## Q33. How do you serve custom error pages?
+
+**Answer:**
 
 ```nginx
 error_page 404 /404.html;
 error_page 500 502 503 504 /50x.html;
 
-location = /404.html { internal; root /var/www/errors; }
-location = /50x.html { internal; root /var/www/errors; }
+location = /404.html { root /var/www/errors; internal; }
+location = /50x.html { root /var/www/errors; internal; }
 ```
 
-Use `internal;` to prevent direct access.
+`internal` means the page can only be reached as a result of `error_page`, not by a direct request.
 
 ---
 
-## Security
+## 10. Security
 
-### Q34. Security headers?
+## Q34. What security headers should I set?
+
+**Answer:**
 
 ```nginx
 add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-Frame-Options "DENY" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'" always;
+add_header X-Content-Type-Options    "nosniff" always;
+add_header X-Frame-Options           "DENY" always;
+add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+add_header Content-Security-Policy   "default-src 'self'" always;
+add_header Permissions-Policy        "geolocation=(), microphone=()" always;
 ```
 
-The `always` flag ensures headers are added on error responses too.
+`always` ensures the header is added even on error responses.
 
----
-
-### Q35. Hide Nginx version?
-
-```nginx
-server_tokens off;
-# Errors and Server header no longer leak version.
-# To remove the Server header entirely, use the headers-more module.
-```
-
----
-
-### Q36. Block by IP / country / user-agent?
-
-```nginx
-deny  10.10.10.0/24;
-allow 10.0.0.0/8;
-deny  all;
-
-# Bad bots
-if ($http_user_agent ~* (curl|wget|nikto|sqlmap)) { return 403; }
-```
-
-Avoid `if` where possible (it has caveats); use `map` for clarity:
-
-```nginx
-map $http_user_agent $bad_bot {
-  default 0;
-  ~*nikto 1;
-  ~*sqlmap 1;
-}
-server {
-  if ($bad_bot) { return 403; }
-}
-```
-
----
-
-### Q37. Limit request size and methods?
-
-```nginx
-client_max_body_size 10M;
-
-# Allow only standard methods
-if ($request_method !~ ^(GET|HEAD|POST|PUT|DELETE|OPTIONS)$) {
-  return 405;
-}
-```
-
----
-
-## Performance Tuning
-
-### Q38. Worker tuning?
-
-```nginx
-worker_processes auto;          # = number of CPU cores
-worker_rlimit_nofile 65536;     # raise FD limit
-
-events {
-  worker_connections 8192;      # per worker
-  use epoll;                    # Linux
-  multi_accept on;
-}
-```
-
-Max connections ≈ `worker_processes * worker_connections`. For reverse proxies, halve that for client+upstream pairs.
-
----
-
-### Q39. sendfile, tcp_nopush, tcp_nodelay?
-
-```nginx
-sendfile on;       # zero-copy file -> socket
-tcp_nopush on;     # send headers + start of file in one packet
-tcp_nodelay on;    # disable Nagle for keep-alive responses
-```
-
-`tcp_nopush` works with `sendfile` to fill packets before sending; `tcp_nodelay` ensures small responses on keep-alive aren't delayed.
-
----
-
-### Q40. Buffer sizing?
-
-```nginx
-client_body_buffer_size      16k;
-client_header_buffer_size    1k;
-large_client_header_buffers  4 8k;
-client_max_body_size         10M;
-
-proxy_buffering    on;
-proxy_buffer_size  8k;
-proxy_buffers      8 16k;
-proxy_busy_buffers_size 32k;
-```
-
-Disable `proxy_buffering` for streaming/SSE so chunks pass straight through.
-
----
-
-### Q41. Keepalive tuning?
-
-```nginx
-keepalive_timeout    65;
-keepalive_requests   1000;        # per connection
-```
-
-For idle backends, ensure `upstream { keepalive 32; }` and `proxy_set_header Connection "";` (see Q28).
-
----
-
-### Q42. How many concurrent connections can Nginx handle?
+## Q35. How do you hide the Nginx version?
 
 **Answer:**
-Hundreds of thousands per box, given enough memory and FDs. Typical bottlenecks: ulimit, ephemeral ports, kernel network stack tuning, backend latency.
 
----
-
-## Operations and Debugging
-
-### Q43. Reload vs restart?
-
-```bash
-nginx -t                       # test config
-nginx -s reload                # graceful reload (no dropped connections)
-systemctl reload nginx
-systemctl restart nginx        # full restart, brief downtime
+```nginx
+http {
+    server_tokens off;
+}
 ```
 
-Reload spawns new workers with new config; old workers finish in-flight requests then exit.
+Errors and the Server header no longer leak the version. To remove the Server header entirely you need the `headers-more` module.
+
+```nginx
+more_set_headers "Server: ";
+```
+
+## Q36. How do you block by IP, country, or user-agent?
+
+**Answer:**
+
+```nginx
+# By IP
+location / {
+    deny  192.0.2.0/24;
+    allow all;
+    proxy_pass http://backend;
+}
+
+# Bad bots
+if ($http_user_agent ~* (badbot|scraper)) {
+    return 403;
+}
+
+# By country (requires GeoIP2 module)
+geoip2 /usr/share/GeoIP/GeoLite2-Country.mmdb {
+    $geoip2_country_code default=XX source=$remote_addr country iso_code;
+}
+map $geoip2_country_code $blocked_country {
+    default 0;
+    CN      1;
+    RU      1;
+}
+server {
+    if ($blocked_country) { return 403; }
+}
+```
+
+## Q37. How do you limit request size and HTTP methods?
+
+**Answer:**
+
+```nginx
+client_max_body_size 10m;     # reject uploads larger than 10 MB
+
+# Allow only standard methods
+if ($request_method !~ ^(GET|HEAD|POST|PUT|DELETE|PATCH|OPTIONS)$) {
+    return 405;
+}
+```
 
 ---
 
-### Q44. Custom log format?
+## 11. Performance Tuning
+
+## Q38. How do you tune workers?
+
+**Answer:**
+
+```nginx
+worker_processes auto;            # one per CPU core (auto detects)
+worker_rlimit_nofile 65535;       # raise the open file limit
+events {
+    worker_connections 4096;      # connections each worker can handle
+    multi_accept       on;
+    use                epoll;     # Linux
+}
+```
+
+Total max connections ≈ `worker_processes` × `worker_connections`.
+
+## Q39. What do `sendfile`, `tcp_nopush`, `tcp_nodelay` do?
+
+**Answer:**
+
+| Directive    | Purpose                                                      |
+| ------------ | ------------------------------------------------------------ |
+| `sendfile`   | Use the kernel `sendfile()` syscall (zero-copy disk to net)  |
+| `tcp_nopush` | Combined with sendfile, sends headers and beginning of file in one packet |
+| `tcp_nodelay`| Disable Nagle's algorithm so small packets go out immediately |
+
+```nginx
+sendfile on;
+tcp_nopush on;
+tcp_nodelay on;
+```
+
+## Q40. How do you size buffers?
+
+**Answer:**
+
+If a request body or response header is larger than the buffer, Nginx writes to a temp file (slow) or fails (`upstream sent too big header`).
+
+```nginx
+client_body_buffer_size       16k;
+client_header_buffer_size      1k;
+large_client_header_buffers    4 8k;
+
+proxy_buffer_size             16k;
+proxy_buffers                  8 16k;
+proxy_busy_buffers_size       32k;
+```
+
+Watch the error log for "too big" warnings and tune accordingly.
+
+## Q41. How do you tune keepalive?
+
+**Answer:**
+
+```nginx
+keepalive_timeout    65s;        # client keepalive
+keepalive_requests   1000;       # requests per keepalive connection
+
+upstream backend {
+    server 10.0.0.1:3000;
+    keepalive          32;       # idle upstream connections in pool
+    keepalive_requests 1000;
+    keepalive_timeout  60s;
+}
+```
+
+## Q42. How many concurrent connections can Nginx handle?
+
+**Answer:**
+
+Practically, tens of thousands per server, limited by:
+
+1. `worker_processes × worker_connections`
+2. Open file descriptor limit (`worker_rlimit_nofile` and the OS `ulimit`)
+3. Available RAM (each connection uses some buffers)
+4. Source-port range and TIME_WAIT sockets if used as a proxy
+
+A single modest VM commonly handles 50k+ idle keepalive connections.
+
+---
+
+## 12. Operations and Debugging
+
+## Q43. What is the difference between reload and restart?
+
+**Answer:**
+
+- **Reload** (`nginx -s reload` or `systemctl reload nginx`) re-reads the config and gracefully replaces workers without dropping connections. Use for almost all changes.
+- **Restart** (`systemctl restart nginx`) stops and re-starts the master. Drops in-flight connections. Needed if you change `user`, listen sockets bound at startup, or upgrade Nginx.
+
+Always test before reloading:
+
+```bash
+sudo nginx -t                # validate config
+sudo systemctl reload nginx
+```
+
+## Q44. How do you set a custom log format?
+
+**Answer:**
 
 ```nginx
 log_format main '$remote_addr - $remote_user [$time_local] '
                 '"$request" $status $body_bytes_sent '
                 '"$http_referer" "$http_user_agent" '
-                'rt=$request_time uct=$upstream_connect_time '
-                'urt=$upstream_response_time uaddr=$upstream_addr '
-                'uri="$request_uri"';
+                '$request_time $upstream_response_time';
 
-access_log /var/log/nginx/access.log main buffer=32k flush=5s;
+access_log /var/log/nginx/access.log main;
 ```
 
-JSON access log:
-```nginx
-log_format json escape=json '{'
-  '"time":"$time_iso8601",'
-  '"remote_addr":"$remote_addr",'
-  '"method":"$request_method",'
-  '"uri":"$request_uri",'
-  '"status":$status,'
-  '"bytes":$body_bytes_sent,'
-  '"rt":$request_time,'
-  '"urt":"$upstream_response_time",'
-  '"ua":"$http_user_agent"'
-  '}';
-```
+`$request_time` is the total time Nginx spent on the request; `$upstream_response_time` is just the backend.
 
----
+## Q45. How do you debug Nginx?
 
-### Q45. Debugging?
+**Answer:**
 
 ```bash
-nginx -T                        # dump full effective config
-nginx -t                        # syntax check
-
-tail -f /var/log/nginx/error.log
-journalctl -u nginx -f
-
-# Verbose error log for a specific server
-error_log /var/log/nginx/example.error.log debug;
+sudo nginx -t                        # syntax check
+sudo nginx -T                        # dump full effective config
+sudo tail -f /var/log/nginx/error.log
+sudo journalctl -u nginx -f
 ```
 
-Common 502: upstream not reachable, wrong port, SELinux/AppArmor blocking, backend crashed, upstream slow + Nginx timeout.
-Common 504: upstream too slow — check `proxy_read_timeout`.
-
----
-
-### Q46. Blue-green deploy with Nginx?
+Verbose error log for a specific server while diagnosing:
 
 ```nginx
-upstream blue  { server 10.0.0.10:3000; }
-upstream green { server 10.0.0.11:3000; }
+error_log /var/log/nginx/example.debug.log debug;
+```
 
-map $http_x_color $upstream_pool {
-  default blue;
-  green   green;
-}
+Test that requests reach the right backend:
+
+```bash
+curl -I -H "Host: example.com" http://127.0.0.1
+```
+
+## Q46. How do you do a blue-green deploy with Nginx?
+
+**Answer:**
+
+Run two backend pools and switch traffic by toggling which one Nginx points at.
+
+```nginx
+upstream blue  { server 10.0.0.1:3000; }
+upstream green { server 10.0.0.2:3000; }
 
 server {
-  listen 443 ssl;
-  location / {
-    proxy_pass http://$upstream_pool;
-  }
+    location / {
+        proxy_pass http://blue;          # change to green and reload to switch
+    }
 }
 ```
 
-To switch, change `default` and `nginx -s reload`. Or use a single `upstream` and swap `server` entries via templating + reload.
+Reload (not restart) to apply with no dropped connections.
 
----
+## Q47. How do you do a canary deploy?
 
-### Q47. Canary deploy?
+**Answer:**
+
+Send a small percentage of traffic to a new version, gradually increasing if it stays healthy.
 
 ```nginx
 split_clients "${remote_addr}${request_uri}" $variant {
-  10%     canary;
-  *       stable;
+    10%     "canary";
+    *       "stable";
 }
 
-upstream stable { server 10.0.0.10:3000; }
-upstream canary { server 10.0.0.11:3000; }
+upstream stable { server 10.0.0.1:3000; }
+upstream canary { server 10.0.0.2:3000; }
 
 server {
-  location / {
-    proxy_pass http://$variant;
-  }
+    location / {
+        proxy_pass http://$variant;
+    }
 }
 ```
 
----
+`split_clients` deterministically buckets clients by the hash of the given key.
 
-### Q48. Nginx as API gateway?
+## Q48. Can Nginx be used as an API gateway?
 
 **Answer:**
-At a basic level, Nginx can do:
-- Routing by path/host/header.
-- Auth via subrequests (`auth_request`).
-- Rate limiting per consumer (using API key as the limit_req key).
-- Header rewriting and CORS.
-- Caching responses.
-- TLS termination and mTLS.
 
-For richer features (token validation, request transformation, observability), Kong or other gateways built on Nginx provide a fuller feature set.
+Yes for basic gateway needs: routing, TLS termination, rate limiting, JWT validation (with `auth_request` or Lua), header rewriting. For advanced features (richer auth, request transforms, plugin ecosystems), consider Kong, Tyk, or APISIX (many are built on Nginx anyway).
 
 ```nginx
-location = /_auth {
-  internal;
-  proxy_pass http://auth-svc/verify;
-  proxy_pass_request_body off;
-  proxy_set_header Content-Length "";
-  proxy_set_header X-Original-URI $request_uri;
+location /auth {
+    internal;
+    proxy_pass http://auth-service/validate;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header X-Original-URI $request_uri;
 }
 
 location /api/ {
-  auth_request /_auth;
-  proxy_pass http://api-backend/;
+    auth_request /auth;
+    proxy_pass http://api-backend;
 }
 ```
 
----
+## Q49. How do you handle CORS?
 
-### Q49. CORS handling?
+**Answer:**
 
 ```nginx
 location /api/ {
-  if ($request_method = OPTIONS) {
-    add_header Access-Control-Allow-Origin  $http_origin always;
-    add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS' always;
-    add_header Access-Control-Allow-Headers 'Authorization, Content-Type' always;
-    add_header Access-Control-Allow-Credentials true always;
-    add_header Access-Control-Max-Age 86400 always;
-    return 204;
-  }
-  add_header Access-Control-Allow-Origin $http_origin always;
-  add_header Access-Control-Allow-Credentials true always;
-  proxy_pass http://backend;
+    if ($request_method = OPTIONS) {
+        add_header Access-Control-Allow-Origin  "https://app.example.com";
+        add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS";
+        add_header Access-Control-Allow-Headers "Authorization, Content-Type";
+        add_header Access-Control-Max-Age       86400;
+        return 204;
+    }
+
+    add_header Access-Control-Allow-Origin "https://app.example.com" always;
+    proxy_pass http://backend;
 }
 ```
 
-For multiple origins, validate against an allowlist via `map`.
+The `OPTIONS` block handles CORS preflight; the second `add_header` handles real responses.
 
----
-
-### Q50. Nginx Plus features (vs OSS)?
+## Q50. What features does Nginx Plus add over open-source Nginx?
 
 **Answer:**
-Commercial features:
-- Active health checks.
-- Dynamic config (DNS-resolved upstreams, on-the-fly updates).
-- Live activity monitoring dashboard.
-- Cookie-based sticky sessions.
-- JWT validation.
-- Cache PURGE API.
-- Session persistence beyond `ip_hash`.
 
-Open-source Nginx covers most needs; many shops use OpenResty, Lua modules, or custom builds for advanced features.
+- Active health checks
+- Sticky-cookie session persistence
+- Live activity dashboard and metrics API
+- Dynamic upstream reconfiguration via API (no reload)
+- JWT validation built-in
+- Advanced caching (purge API)
 
----
+For most workloads, open-source Nginx is enough.
 
-### Q51. Common pitfalls?
+## Q51. What are common Nginx pitfalls?
 
-1. Forgetting `proxy_http_version 1.1` and `Connection ""` — kills upstream keepalive.
-2. Wrong `proxy_pass` URI semantics (trailing slash).
-3. `if` inside `location` (use sparingly — many directives don't behave as expected).
-4. Missing `try_files` for SPA routing.
-5. Not setting `client_max_body_size` (default 1M can break uploads).
-6. Trusting `X-Forwarded-For` from anywhere (set `set_real_ip_from`).
-7. Reusing TLS sessions improperly across server blocks.
-8. Forgetting `always` on `add_header` — error responses lack the header.
-9. Compressing already-compressed assets.
-10. Logging at debug level in production (huge files, slow).
-11. No log rotation (logrotate config).
-12. Not increasing `worker_rlimit_nofile` for high-concurrency setups.
+**Answer:**
 
----
+1. Forgetting `proxy_set_header Host $host` — backends see "localhost" or wrong vhost.
+2. The `proxy_pass` trailing-slash trap.
+3. Using `if` inside locations for non-rewriting purposes (often broken; use `map`).
+4. Skipping `nginx -t` and reloading bad config.
+5. No HSTS / weak TLS settings.
+6. `client_max_body_size` default of 1 MB rejecting uploads.
+7. Logs filling disk because no `logrotate`.
 
-### Q52. Production-ready snippet?
+## Q52. Show me a production-ready snippet.
+
+**Answer:**
 
 ```nginx
-server {
-  listen 443 ssl http2;
-  server_name app.example.com;
+worker_processes auto;
+worker_rlimit_nofile 65535;
 
-  ssl_certificate     /etc/ssl/app.fullchain.pem;
-  ssl_certificate_key /etc/ssl/app.privkey.pem;
-  ssl_protocols TLSv1.2 TLSv1.3;
-  ssl_session_cache shared:SSL:10m;
-  ssl_stapling on;
-  ssl_stapling_verify on;
+events { worker_connections 4096; multi_accept on; }
 
-  add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  server_tokens off;
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
 
-  client_max_body_size 20M;
-  gzip on;
-  gzip_types text/plain text/css application/json application/javascript;
+    sendfile on; tcp_nopush on; tcp_nodelay on;
+    keepalive_timeout 65; keepalive_requests 1000;
+    server_tokens off;
 
-  set_real_ip_from 10.0.0.0/8;
-  real_ip_header X-Forwarded-For;
-  real_ip_recursive on;
+    gzip on; gzip_vary on; gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
 
-  limit_req_zone $binary_remote_addr zone=api:10m rate=20r/s;
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                    '$request_time $upstream_response_time';
+    access_log /var/log/nginx/access.log main;
+    error_log  /var/log/nginx/error.log warn;
 
-  location /healthz {
-    access_log off;
-    return 200 "ok\n";
-  }
+    limit_req_zone $binary_remote_addr zone=api_rl:10m rate=10r/s;
 
-  location /api/ {
-    limit_req zone=api burst=40 nodelay;
-    proxy_http_version 1.1;
-    proxy_set_header Host              $host;
-    proxy_set_header X-Real-IP         $remote_addr;
-    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header Connection        "";
-    proxy_connect_timeout 5s;
-    proxy_read_timeout    30s;
-    proxy_pass http://api_upstream;
-  }
+    upstream backend {
+        server 10.0.0.1:3000;
+        server 10.0.0.2:3000;
+        keepalive 32;
+    }
 
-  location / {
-    root /var/www/app;
-    try_files $uri /index.html;
-    expires 1h;
-  }
-}
+    server {
+        listen 80;
+        server_name example.com;
+        return 301 https://$host$request_uri;
+    }
 
-upstream api_upstream {
-  least_conn;
-  keepalive 64;
-  server 10.0.1.10:3000 max_fails=3 fail_timeout=10s;
-  server 10.0.1.11:3000 max_fails=3 fail_timeout=10s;
+    server {
+        listen 443 ssl http2;
+        server_name example.com;
+
+        ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_session_cache   shared:SSL:10m;
+
+        add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+
+        client_max_body_size 10m;
+
+        location /api/ {
+            limit_req zone=api_rl burst=20 nodelay;
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            proxy_set_header Host              $host;
+            proxy_set_header X-Real-IP         $remote_addr;
+            proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location / {
+            root /var/www/example;
+            try_files $uri $uri/ /index.html;
+        }
+    }
 }
 ```

@@ -1,80 +1,67 @@
-# Tailwind CSS Interview Questions
+# Tailwind CSS Interview Questions — Complete Q&A Guide
 
-**Level:** Mid to Senior
-**Topics:** Utility-First, Configuration, Theming, JIT, v3/v4, Plugins, Performance, Design Systems
+**Focus:** Tailwind v3 and v4, utility-first workflow, configuration, theming, plugins, performance, and design systems.
 
----
-
-## Table of Contents
-
-1. [Fundamentals](#fundamentals)
-2. [Configuration and Theming](#configuration-and-theming)
-3. [Responsive Design and Modifiers](#responsive-design-and-modifiers)
-4. [Dark Mode](#dark-mode)
-5. [Components and @apply](#components-and-apply)
-6. [JIT, Content, Production Build](#jit-content-production-build)
-7. [Plugins and Ecosystem](#plugins-and-ecosystem)
-8. [Tailwind v4](#tailwind-v4)
-9. [Patterns and Design Systems](#patterns-and-design-systems)
-10. [Comparisons and Trade-offs](#comparisons-and-trade-offs)
+Each question explains the concept and shows a real example you can copy into a project.
 
 ---
 
-## Fundamentals
+## 1. Fundamentals
 
-### Q1. What is Tailwind CSS?
+## Q1. What is Tailwind CSS?
 
 **Answer:**
-Tailwind is a utility-first CSS framework. Instead of pre-styled components, it provides low-level utility classes (`flex`, `pt-4`, `text-center`) that you compose directly in markup.
+
+Tailwind is a utility-first CSS framework. Instead of writing custom CSS classes, you compose small utility classes (`p-4`, `text-lg`, `bg-blue-500`) directly in your markup. The build step extracts only the classes you actually use, producing a small CSS file.
 
 ```html
-<button class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+<button class="bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded">
   Save
 </button>
 ```
 
-It scans your source files, generates only the utilities you actually use, and outputs a small CSS bundle.
-
----
-
-### Q2. What is utility-first and why use it?
-
-**Answer:**
-Utility-first means building UIs from many small, single-purpose classes rather than a handful of named component classes.
-
-Benefits:
-- **No naming overhead** — no `card-header__title--featured` to invent
-- **Constraints by default** — spacing/colors come from a design scale, enforcing consistency
-- **No dead CSS** — unused utilities aren't shipped
-- **Co-location** — markup and styles live together; no CSS file to hunt
-- **Refactor confidently** — deleting markup deletes styles
-
-Trade-offs: HTML is verbose, learning curve for class names, less semantic markup.
-
----
-
-### Q3. How is Tailwind different from Bootstrap?
+## Q2. What is utility-first and why use it?
 
 **Answer:**
 
-| | Tailwind | Bootstrap |
-|---|----------|-----------|
-| Approach | Utility-first | Component-first |
-| Output | Custom design | "Bootstrap look" out of the box |
-| JS dependencies | None (use Headless UI / Radix) | jQuery (v4), bundled JS (v5) |
-| Bundle size | Tiny (purged) | Larger by default |
-| Customization | Configurable design tokens | Sass overrides |
-| Lock-in | Low (just CSS classes) | Medium (component conventions) |
+Utility-first means using single-purpose classes (`mt-4`, `flex`, `text-center`) instead of writing component-level CSS (`.card`, `.btn-primary`). Benefits:
 
-Tailwind targets teams building custom designs. Bootstrap targets faster prototyping with a known visual identity.
+- No naming gymnastics — class names already describe their effect.
+- No unused CSS in production thanks to scanning.
+- Consistent design tokens (spacing, colors).
+- Faster iteration — no jumping between HTML and CSS files.
 
----
+```html
+<!-- Traditional CSS approach -->
+<div class="card">
+  <h2 class="card-title">Title</h2>
+</div>
 
-### Q4. How do you install Tailwind in a project?
+<!-- Utility-first -->
+<div class="bg-white rounded-lg shadow p-4">
+  <h2 class="text-lg font-semibold">Title</h2>
+</div>
+```
+
+## Q3. How is Tailwind different from Bootstrap?
 
 **Answer:**
 
-For v3:
+| | Bootstrap | Tailwind |
+| --- | --- | --- |
+| Approach | Pre-built components (`.btn`, `.card`) | Utility classes |
+| Customization | Override SCSS variables | Configure design tokens, compose utilities |
+| Output size | All components shipped | Only used classes shipped |
+| Look | Recognizable Bootstrap default | Generic, requires design choices |
+
+Bootstrap gives you components quickly. Tailwind gives you primitives to build any design.
+
+## Q4. How do you install Tailwind in a project?
+
+**Answer:**
+
+For Vite/Next/Vue (v3 example):
+
 ```bash
 npm install -D tailwindcss postcss autoprefixer
 npx tailwindcss init -p
@@ -83,10 +70,10 @@ npx tailwindcss init -p
 ```js
 // tailwind.config.js
 module.exports = {
-  content: ['./src/**/*.{html,js,jsx,ts,tsx,vue}'],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx,vue}'],
   theme: { extend: {} },
   plugins: [],
-}
+};
 ```
 
 ```css
@@ -96,90 +83,68 @@ module.exports = {
 @tailwind utilities;
 ```
 
-For v4 (CSS-first):
-```bash
-npm install tailwindcss @tailwindcss/vite
-```
+In v4 the install is simpler — see Q30.
+
+## Q5. What does each `@tailwind` directive do (v3)?
+
+**Answer:**
+
+- `@tailwind base` — resets and base typography (Preflight + element styles).
+- `@tailwind components` — Tailwind's component-level classes and any custom ones.
+- `@tailwind utilities` — all utility classes.
+
+You can also place custom rules inside `@layer base | components | utilities` so they participate in the cascade correctly.
 
 ```css
-/* index.css */
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn-primary { @apply bg-blue-500 text-white px-4 py-2 rounded; }
+}
 ```
 
-No config file required by default in v4.
-
----
-
-### Q5. What does each `@tailwind` directive do (v3)?
+## Q6. What is Preflight?
 
 **Answer:**
 
-```css
-@tailwind base;       /* Preflight resets and base styles */
-@tailwind components; /* User-defined components and plugins */
-@tailwind utilities;  /* Utility classes */
+Preflight is Tailwind's built-in CSS reset. It removes default browser styling (margins, list bullets, heading sizes), normalizes box-sizing, and gives you a clean canvas. You can disable it via the config if you need.
+
+```js
+// tailwind.config.js
+module.exports = {
+  corePlugins: { preflight: false },
+};
 ```
 
-Order matters because it determines cascade priority — utilities are last so they win.
-
-In v4, this is replaced with a single `@import "tailwindcss";` (which internally uses `@layer`).
-
----
-
-### Q6. What is Preflight?
+## Q7. What are arbitrary values?
 
 **Answer:**
-Tailwind's opinionated CSS reset (built on modern-normalize). It:
-- removes default margins
-- unstyles headings (`h1`-`h6` look like body text)
-- resets border styles to allow `border` utilities to work
-- makes images block-level by default
-- resets list styles
 
-Disable in v3 via `corePlugins: { preflight: false }` or layer scope it. In v4, scope with `@import "tailwindcss/preflight" layer(base);`.
-
-Common gotcha: `<h1>` looks plain — apply `text-3xl font-bold` explicitly. Or use the typography plugin for prose content.
-
----
-
-### Q7. What are arbitrary values?
-
-**Answer:**
-Bracket syntax for one-off values not in your theme:
+Arbitrary values let you use any value inline without adding to the config, using square-bracket syntax.
 
 ```html
-<div class="top-[117px] grid-cols-[200px_1fr_auto] bg-[#1da1f2]">
-<div class="text-[clamp(1rem,2vw,2rem)]">
-<div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
+<div class="top-[117px] grid-cols-[1fr_2fr_auto] text-[#1da1f2]">
+  Custom
+</div>
 ```
 
-Also arbitrary properties:
-```html
-<div class="[mask-type:luminance] [scrollbar-gutter:stable]">
-```
-
-And arbitrary variants:
-```html
-<div class="[&:nth-child(3)]:bg-red-500 [&_p]:mt-4">
-<div class="lg:[&:nth-child(3)]:hidden">
-```
-
-Use sparingly — if you reach for arbitrary values often, extend the theme instead.
+Use sparingly — repeated arbitrary values should become design tokens.
 
 ---
 
-## Configuration and Theming
+## 2. Configuration and Theming
 
-### Q8. How do you customize the theme?
+## Q8. How do you customize the theme?
 
 **Answer:**
-v3:
+
+Edit `tailwind.config.js`. Use `extend` to add to defaults; replace top-level keys to override completely.
+
 ```js
 module.exports = {
   theme: {
-    // overrides default
-    screens: { sm: '640px', md: '768px' },
-    // extends default (preferred)
     extend: {
       colors: {
         brand: {
@@ -188,63 +153,52 @@ module.exports = {
           900: '#1e3a8a',
         },
       },
-      spacing: { 18: '4.5rem' },
+      spacing: { '128': '32rem' },
       fontFamily: { display: ['Inter', 'sans-serif'] },
     },
   },
-}
+};
 ```
 
-v4 (CSS-first):
-```css
-@import "tailwindcss";
-
-@theme {
-  --color-brand-500: #3b82f6;
-  --spacing-18: 4.5rem;
-  --font-display: "Inter", sans-serif;
-}
+```html
+<div class="bg-brand-500 text-brand-50 font-display">Hello</div>
 ```
 
-`extend` adds without replacing defaults; top-level keys replace the whole namespace.
-
----
-
-### Q9. How do you define design tokens?
+## Q9. How do you define design tokens?
 
 **Answer:**
-Tokens are theme values referenced as utilities. Map design system primitives:
+
+Design tokens are reusable values for colors, spacing, typography, shadows, and radii. Define them in `theme.extend` and reference by name.
 
 ```js
-extend: {
-  colors: {
-    primary: 'var(--color-primary)',
-    surface: 'var(--color-surface)',
-  },
-  fontSize: {
-    'display-lg': ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em' }],
-  },
-  borderRadius: {
-    'card': '0.875rem',
+theme: {
+  extend: {
+    colors: { primary: '#4f46e5', surface: '#fafafa' },
+    borderRadius: { card: '0.75rem' },
+    boxShadow: { card: '0 1px 3px rgba(0,0,0,0.1)' },
   },
 }
 ```
 
-Pairing CSS variables with theme values gives runtime theming (dark mode, brand swaps) plus utility ergonomics.
+```html
+<div class="bg-surface rounded-card shadow-card p-4">Card</div>
+```
 
----
-
-### Q10. What's the difference between `theme.extend` and replacing `theme`?
+## Q10. What's the difference between `theme.extend` and replacing `theme`?
 
 **Answer:**
-- Top-level (`theme.colors = {...}`) — **replaces** the default scale entirely. Lose `red-500`, `blue-100`, etc.
-- `theme.extend.colors = {...}` — **merges** with defaults. Both your custom colors and the defaults are available.
 
-Use top-level only when you want to enforce a strictly limited palette.
+`theme.extend` keeps all defaults and adds yours. Replacing a key (e.g. `theme.colors`) wipes the defaults — only your colors remain.
 
----
+```js
+// Adds, keeps all default colors
+theme: { extend: { colors: { brand: '#000' } } }
 
-### Q11. How do you customize breakpoints?
+// Replaces — only `brand` exists, no `red`, `blue`, etc.
+theme: { colors: { brand: '#000' } }
+```
+
+## Q11. How do you customize breakpoints?
 
 **Answer:**
 
@@ -256,445 +210,371 @@ theme: {
     lg: '1024px',
     xl: '1280px',
     '2xl': '1536px',
-    // Custom
-    'tablet': '900px',
-    'desktop': { 'min': '1100px', 'max': '1599px' },
-    'print': { 'raw': 'print' },
+    'tablet': '900px', // custom
   },
 }
 ```
 
-Tailwind is mobile-first: bare classes apply at all sizes; `md:` applies at >= 768px.
-
-In v4, breakpoints are CSS variables: `--breakpoint-md: 48rem;`.
-
----
-
-## Responsive Design and Modifiers
-
-### Q12. What modifiers does Tailwind support?
-
-**Answer:**
-Categories:
-- **Responsive**: `sm:`, `md:`, `lg:`, `xl:`, `2xl:`
-- **State**: `hover:`, `focus:`, `focus-visible:`, `active:`, `disabled:`, `checked:`, `required:`, `valid:`, `invalid:`, `placeholder-shown:`
-- **Group/peer**: `group-hover:`, `peer-checked:`
-- **Theme**: `dark:`, `motion-reduce:`, `motion-safe:`, `contrast-more:`, `print:`, `rtl:`, `ltr:`
-- **Pseudo-elements**: `before:`, `after:`, `placeholder:`, `marker:`, `selection:`, `file:`
-- **Children**: `first:`, `last:`, `odd:`, `even:`, `only:`, `empty:`
-- **Has/not (v3.4+)**: `has-[...]:`, `not-[...]:`
-- **Data attributes**: `data-[state=open]:`, `aria-[expanded=true]:`
-
-Stack modifiers: `md:hover:focus-visible:bg-blue-500`. Order doesn't change matching but readability matters.
-
----
-
-### Q13. How do `group` and `peer` modifiers work?
-
-**Answer:**
-
-**`group`** styles children based on a parent's state:
-
 ```html
-<a href="#" class="group">
-  <h3 class="group-hover:text-blue-600">Title</h3>
-  <p class="group-hover:underline">Description</p>
-</a>
-```
-
-**`peer`** styles a sibling based on a previous sibling's state:
-
-```html
-<input type="checkbox" class="peer">
-<span class="peer-checked:text-green-600">Active</span>
-```
-
-Multiple groups: name them.
-```html
-<div class="group/card">
-  <div class="group/header">
-    <h3 class="group-hover/card:text-red group-hover/header:underline">
-```
-
-`peer` requires DOM order — the peer must come *before* the styled element.
-
----
-
-### Q14. How do you target child elements without classes?
-
-**Answer:**
-
-Built-in:
-```html
-<ul class="divide-y divide-gray-200 [&>li]:py-2">
-```
-
-Arbitrary variants:
-```html
-<div class="[&>p]:mb-2 [&_a]:text-blue-600">
-  <p>Para</p>
-  <a href="#">Link</a>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+  Responsive grid
 </div>
 ```
 
-`>` direct child, ` ` (or `_` in arbitrary variants) any descendant.
-
-For nested content (e.g. markdown HTML), prefer the `@tailwindcss/typography` plugin's `prose` class.
-
 ---
 
-### Q15. What does `:has()` enable in Tailwind?
+## 3. Responsive Design and Modifiers
+
+## Q12. What modifiers does Tailwind support?
 
 **Answer:**
+
+Modifiers are prefixes that conditionally apply utilities. Examples:
+
+| Modifier | Meaning |
+| --- | --- |
+| `sm:` `md:` `lg:` | Min-width breakpoint |
+| `hover:` `focus:` `active:` | Interaction states |
+| `dark:` | Dark mode |
+| `first:` `last:` `odd:` `even:` | Position in a list |
+| `disabled:` `checked:` | Form states |
+| `group-hover:` `peer-focus:` | Parent or sibling state |
 
 ```html
-<div class="has-[input:checked]:bg-green-50">
-  <input type="checkbox" />
-</div>
+<button class="bg-blue-500 hover:bg-blue-600 disabled:opacity-50 dark:bg-blue-700">
+  Submit
+</button>
 ```
 
-Style a parent based on what it contains. Useful for forms, conditionally highlighted cards, navigation indicators based on active children — without JS state syncing to classes.
-
----
-
-## Dark Mode
-
-### Q16. What dark mode strategies does Tailwind support?
+## Q13. How do `group` and `peer` modifiers work?
 
 **Answer:**
 
-**Media-based** (system preference, default):
+Add `group` to a parent, then style children with `group-hover:`, `group-focus:`, etc. Add `peer` to a sibling and use `peer-*:` on a following sibling.
+
+```html
+<div class="group p-4 hover:bg-gray-100">
+  <h3 class="text-gray-900">Title</h3>
+  <p class="text-gray-500 group-hover:text-gray-900">
+    Highlights when parent is hovered
+  </p>
+</div>
+
+<input type="checkbox" class="peer" />
+<span class="peer-checked:text-green-600">Checked!</span>
+```
+
+## Q14. How do you target child elements without classes?
+
+**Answer:**
+
+Use `[&>*]:` arbitrary variants.
+
+```html
+<ul class="[&>li]:py-2 [&>li]:border-b">
+  <li>One</li>
+  <li>Two</li>
+</ul>
+```
+
+This applies `py-2` and `border-b` to every direct `<li>` child without adding classes to each.
+
+## Q15. What does `:has()` enable in Tailwind?
+
+**Answer:**
+
+The `has-[...]` modifier lets a parent style itself based on its descendants.
+
+```html
+<label class="block p-4 has-[:checked]:bg-blue-50 has-[:checked]:border-blue-500 border">
+  <input type="checkbox" /> Accept
+</label>
+```
+
+When the inner checkbox is checked, the label gets the highlighted styles.
+
+---
+
+## 4. Dark Mode
+
+## Q16. What dark mode strategies does Tailwind support?
+
+**Answer:**
+
+- `media` (default in v3) — uses `prefers-color-scheme`.
+- `class` — toggles based on a `dark` class higher in the tree.
+- `selector` (v3.4+) — like `class` but customizable selector.
+
 ```js
 // tailwind.config.js
-darkMode: 'media',
+module.exports = {
+  darkMode: 'class', // toggle via class="dark"
+};
 ```
+
 ```html
-<div class="bg-white dark:bg-gray-900">
+<html class="dark">
+  <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+    Hello
+  </body>
+</html>
 ```
 
-**Class-based** (user toggleable):
-```js
-darkMode: 'class',
-```
-```html
-<html class="dark"><body class="bg-white dark:bg-gray-900">
-```
-
-**Selector-based / data attribute** (custom):
-```js
-darkMode: ['selector', '[data-theme="dark"]'],
-```
-
-Class strategy is most flexible — pair with system preference detection plus override toggle. v4 uses `@variant dark (...)`.
-
----
-
-### Q17. How do you implement a dark mode toggle without flash?
+## Q17. How do you implement a dark mode toggle without flash?
 
 **Answer:**
-Inline script before any rendering:
+
+Apply the saved theme synchronously before hydration to avoid a flash of light content.
 
 ```html
+<!-- Inline script in <head>, runs before render -->
 <script>
-  const t = localStorage.getItem('theme');
-  if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+  const saved = localStorage.theme;
+  const prefers = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || (!saved && prefers)) {
     document.documentElement.classList.add('dark');
   }
 </script>
 ```
 
-Place in `<head>` synchronously, before stylesheets. Toggle component:
-
 ```js
-function setTheme(mode) {
-  if (mode === 'dark') document.documentElement.classList.add('dark');
-  else document.documentElement.classList.remove('dark');
-  localStorage.setItem('theme', mode);
+// Toggle button
+function toggleTheme() {
+  const html = document.documentElement;
+  html.classList.toggle('dark');
+  localStorage.theme = html.classList.contains('dark') ? 'dark' : 'light';
 }
-```
-
-Add `color-scheme: dark` for native control theming:
-```css
-.dark { color-scheme: dark; }
 ```
 
 ---
 
-## Components and @apply
+## 5. Components and @apply
 
-### Q18. What is `@apply` and when should you use it?
+## Q18. What is `@apply` and when should you use it?
 
 **Answer:**
-`@apply` lets you inline utilities into a custom CSS rule:
+
+`@apply` lets you compose utilities into a custom class.
 
 ```css
 @layer components {
+  .btn {
+    @apply px-4 py-2 rounded font-medium;
+  }
   .btn-primary {
-    @apply px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700;
+    @apply btn bg-blue-500 text-white hover:bg-blue-600;
   }
 }
 ```
 
-Use when:
-- you need to expose styles to non-utility consumers (third-party form libraries that take a className)
-- a complex selector requires utilities that can't easily be expressed in markup
-- abstracting deeply repeated combinations and component extraction (React/Vue) isn't enough
+Use it sparingly — only when you have a real reason like a third-party library expecting a class. Heavy `@apply` use defeats the purpose of utility-first.
 
-Anti-pattern: don't recreate Bootstrap by `@apply`-ing every utility into named classes — you lose Tailwind's main benefit. Prefer component composition (React/Vue/template partials) instead.
-
----
-
-### Q19. Components versus utilities — when to make a component?
+## Q19. Components versus utilities — when to make a component?
 
 **Answer:**
 
-Use **utilities directly** for unique, one-off layouts. Use **a component** (template partial, React/Vue component) for repeated, named UI like buttons or cards. Use **`@apply`** sparingly when neither markup-level reuse works.
+Make a component (Vue/React/Svelte) when the same combination of utilities appears in many places. Components let you change the design once and update everywhere. Avoid creating CSS classes for repeated patterns — use components or template loops instead.
 
 ```jsx
 // Better than .btn-primary CSS class
-function Button({ variant = 'primary', children }) {
+function Button({ children, variant = 'primary' }) {
+  const styles = {
+    primary: 'bg-blue-500 hover:bg-blue-600 text-white',
+    secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-900',
+  };
   return (
-    <button className={cn(
-      'px-4 py-2 rounded font-medium transition',
-      variant === 'primary' && 'bg-blue-600 text-white hover:bg-blue-700',
-      variant === 'secondary' && 'bg-gray-200 text-gray-900 hover:bg-gray-300',
-    )}>
+    <button className={`px-4 py-2 rounded font-medium ${styles[variant]}`}>
       {children}
     </button>
   );
 }
 ```
 
-Tools: `clsx`, `classnames`, `cva` (class-variance-authority), `tailwind-merge` (deduplicates conflicting classes).
-
----
-
-### Q20. What is `tailwind-merge` and why use it?
+## Q20. What is `tailwind-merge` and why use it?
 
 **Answer:**
-Naive class merging breaks because Tailwind's last-wins rule depends on source order in CSS, not class string order:
 
-```js
-clsx('px-2', 'px-4')  // "px-2 px-4" — both apply, CSS order wins (which?)
-```
-
-`tailwind-merge` understands Tailwind semantics:
+`tailwind-merge` resolves conflicts between Tailwind classes when you concatenate them. Without it, both classes are emitted and the later one in CSS source wins (which may be unpredictable).
 
 ```js
 import { twMerge } from 'tailwind-merge';
-twMerge('px-2 px-4')              // "px-4"
-twMerge('text-red-500', 'text-blue-500') // "text-blue-500"
+
+twMerge('p-2 p-4');                  // → 'p-4'
+twMerge('text-red-500', 'text-blue-500'); // → 'text-blue-500'
 ```
 
-Combined with `clsx`:
-```js
-import { cn } from '@/lib/utils';  // wrapper around clsx + twMerge
-cn('px-2 py-1', isActive && 'bg-blue-500', className)
+```jsx
+function Button({ className, ...props }) {
+  return (
+    <button
+      className={twMerge('px-4 py-2 bg-blue-500 text-white', className)}
+      {...props}
+    />
+  );
+}
+
+<Button className="bg-red-500" /> // red, not blue
 ```
 
-Essential when allowing components to accept overriding `className` props.
-
----
-
-### Q21. What is CVA (class-variance-authority)?
+## Q21. What is CVA (class-variance-authority)?
 
 **Answer:**
-A utility for building typed component variants:
+
+CVA helps build typed variant APIs for components — replacing manual ternary class logic.
 
 ```js
 import { cva } from 'class-variance-authority';
 
-const button = cva('rounded font-medium transition', {
+const button = cva('px-4 py-2 rounded font-medium', {
   variants: {
-    variant: {
-      primary: 'bg-blue-600 text-white hover:bg-blue-700',
-      secondary: 'bg-gray-200 text-gray-900',
+    intent: {
+      primary: 'bg-blue-500 text-white hover:bg-blue-600',
+      danger: 'bg-red-500 text-white hover:bg-red-600',
     },
     size: {
-      sm: 'px-2 py-1 text-sm',
-      md: 'px-4 py-2',
-      lg: 'px-6 py-3 text-lg',
+      sm: 'text-sm py-1',
+      md: 'text-base',
     },
   },
-  compoundVariants: [
-    { variant: 'primary', size: 'lg', class: 'shadow-lg' },
-  ],
-  defaultVariants: { variant: 'primary', size: 'md' },
+  defaultVariants: { intent: 'primary', size: 'md' },
 });
 
-<button className={button({ variant: 'secondary', size: 'sm' })}>
+<button className={button({ intent: 'danger', size: 'sm' })}>Delete</button>
 ```
 
-Used heavily in shadcn/ui-style component libraries.
-
 ---
 
-## JIT, Content, Production Build
+## 6. JIT, Content, Production Build
 
-### Q22. What is JIT mode?
-
-**Answer:**
-Just-in-Time compilation — Tailwind generates only the utilities found in your source on every change. In v3 it became the default and the only mode; in v4 the engine is rebuilt for even faster JIT.
-
-Benefits:
-- arbitrary values work (`top-[117px]`)
-- every variant available without bloating output
-- tiny CSS in dev and prod
-- fast incremental builds
-
----
-
-### Q23. How does content scanning work?
+## Q22. What is JIT mode?
 
 **Answer:**
-Tailwind reads files matching `content` globs and extracts strings that look like classnames via regex:
+
+Just-In-Time compilation generates CSS on demand based on the classes it finds in your source files. It enables arbitrary values (`top-[37px]`), faster rebuilds, and small output. JIT is the default since Tailwind v3.
+
+## Q23. How does content scanning work?
+
+**Answer:**
+
+Tailwind scans the files listed in `content` for class names and only emits CSS for what it finds. Patterns must include all template files.
 
 ```js
-content: [
-  './src/**/*.{html,js,jsx,ts,tsx,vue,svelte}',
-  './node_modules/some-ui-lib/**/*.js',
-]
+module.exports = {
+  content: [
+    './index.html',
+    './src/**/*.{js,ts,jsx,tsx,vue,svelte}',
+    './pages/**/*.{html,php}',
+  ],
+};
 ```
 
-In v4, scanning is automatic with sensible defaults; configurable via `@source`.
+A common pitfall: if your file extension isn't included, classes are stripped from the build.
 
-Critical rule: **Tailwind cannot detect dynamically constructed class names**.
+## Q24. What is the safelist?
+
+**Answer:**
+
+`safelist` forces Tailwind to keep specified classes even if it cannot find them in source — useful for classes built dynamically (e.g., `bg-${color}-500`).
+
+```js
+module.exports = {
+  safelist: [
+    'bg-red-500',
+    { pattern: /bg-(red|green|blue)-(100|500|900)/ },
+  ],
+};
+```
+
+But prefer building full class names in JS so the scanner can find them:
 
 ```jsx
-// Broken — `bg-${color}-500` is not a literal in source
-<div className={`bg-${color}-500`}>
-
-// Fix — use full class strings
-const colorMap = { red: 'bg-red-500', blue: 'bg-blue-500' };
-<div className={colorMap[color]}>
+const colors = { red: 'bg-red-500', green: 'bg-green-500' };
+<div className={colors[color]} />
 ```
 
-For external sources: include them in `content` or use `safelist`.
+## Q25. How do you optimize Tailwind for production?
+
+**Answer:**
+
+- Make sure `content` covers all template files (the scanner removes unused classes).
+- Minify CSS via your bundler (Vite, Next.js do this automatically).
+- Avoid arbitrary values for repeating patterns — use design tokens.
+- Combine with gzip/brotli at the server.
+
+A typical Tailwind production CSS file is 5-15 KB gzipped.
 
 ---
 
-### Q24. What is the safelist?
+## 7. Plugins and Ecosystem
+
+## Q26. What is the typography plugin?
 
 **Answer:**
-Forces Tailwind to include classes regardless of detection:
+
+`@tailwindcss/typography` styles raw HTML content (like Markdown output) with a single `prose` class.
+
+```bash
+npm install -D @tailwindcss/typography
+```
 
 ```js
-safelist: [
-  'bg-red-500',
-  { pattern: /bg-(red|green|blue)-(100|500|900)/, variants: ['hover', 'md'] },
-]
+plugins: [require('@tailwindcss/typography')]
 ```
 
-Use only for classes coming from CMS content, dynamic data, or external libraries. Overuse defeats purging.
-
----
-
-### Q25. How do you optimize Tailwind for production?
-
-**Answer:**
-- Ensure `content` globs are accurate so unused classes are purged
-- Use `cssnano` / `lightningcss` for minification (built into v4)
-- Enable Brotli/gzip on the server
-- Inline critical CSS for above-the-fold (frameworks usually do this)
-- Audit final CSS file size; typical apps land under 10–30 KB compressed
-- Don't pull entire icon sets via classes — ship as components
-- Avoid massive arbitrary variant abuse, which can blow up class count
-
----
-
-## Plugins and Ecosystem
-
-### Q26. What is the typography plugin?
-
-**Answer:**
-`@tailwindcss/typography` provides the `prose` class for styling markdown/CMS HTML:
-
 ```html
-<article class="prose prose-lg dark:prose-invert prose-blue">
-  <!-- raw HTML from markdown -->
+<article class="prose dark:prose-invert max-w-none">
+  <h1>Title</h1>
+  <p>Markdown content...</p>
 </article>
 ```
 
-Features:
-- Sensible defaults for headings, lists, code, blockquotes
-- Modifiers: `prose-sm`, `prose-lg`, `prose-xl`
-- Color themes: `prose-slate`, `prose-blue`, etc.
-- Dark mode: `prose-invert`
-- Element overrides: `prose-headings:text-red-500 prose-a:text-blue-600`
-
-Indispensable for blogs, docs, CMS-rendered content.
-
----
-
-### Q27. What does the forms plugin do?
+## Q27. What does the forms plugin do?
 
 **Answer:**
-`@tailwindcss/forms` resets form-control styling so utilities work consistently across browsers (without it, native styles override Tailwind on `<select>`, `<input type="checkbox">`, etc.).
+
+`@tailwindcss/forms` resets browser form controls to a consistent look that is easier to style with utilities.
 
 ```js
-plugins: [require('@tailwindcss/forms')],
+plugins: [require('@tailwindcss/forms')]
 ```
 
-Strategies:
-- `'base'` — global reset
-- `'class'` — opt-in via `form-input`, `form-select`, etc.
+```html
+<input
+  type="text"
+  class="rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+/>
+```
 
-Pairs well with `@tailwindcss/typography` (which scopes its resets to `.prose`).
-
----
-
-### Q28. What is Headless UI and how does it pair with Tailwind?
+## Q28. What is Headless UI and how does it pair with Tailwind?
 
 **Answer:**
-Headless UI (Tailwind Labs) provides accessible, unstyled UI primitives — Dialog, Menu, Combobox, Listbox, Disclosure, Transition — for React and Vue. You bring the styling, they bring the accessibility (focus management, ARIA, keyboard nav).
+
+Headless UI provides unstyled, accessible component primitives (Dialog, Menu, Listbox, Combobox) that you style with Tailwind. It handles keyboard interactions, focus traps, and ARIA correctly.
 
 ```jsx
-import { Menu } from '@headlessui/react';
+import { Dialog } from '@headlessui/react';
 
-<Menu>
-  <Menu.Button className="px-4 py-2 bg-blue-600 text-white rounded">Options</Menu.Button>
-  <Menu.Items className="absolute mt-2 bg-white shadow-lg rounded">
-    <Menu.Item>{({ active }) => (
-      <a className={`block px-4 py-2 ${active ? 'bg-gray-100' : ''}`} href="#">Edit</a>
-    )}</Menu.Item>
-  </Menu.Items>
-</Menu>
+<Dialog open={open} onClose={setOpen} className="relative z-50">
+  <div className="fixed inset-0 bg-black/50" />
+  <Dialog.Panel className="bg-white rounded-lg p-6">
+    <Dialog.Title className="font-bold text-lg">Confirm</Dialog.Title>
+  </Dialog.Panel>
+</Dialog>
 ```
 
-Alternatives: Radix UI, React Aria, Ariakit. shadcn/ui combines Radix with Tailwind for copy-paste components.
-
----
-
-### Q29. How do you write a custom Tailwind plugin?
+## Q29. How do you write a custom Tailwind plugin?
 
 **Answer:**
 
 ```js
-// tailwind.config.js
 const plugin = require('tailwindcss/plugin');
 
 module.exports = {
   plugins: [
-    plugin(function({ addUtilities, addComponents, addVariant, theme, matchUtilities }) {
-      // Static utilities
+    plugin(function ({ addUtilities, theme }) {
       addUtilities({
-        '.text-balance': { 'text-wrap': 'balance' },
-      });
-
-      // Dynamic utilities
-      matchUtilities(
-        { 'tab': (value) => ({ tabSize: value }) },
-        { values: theme('tabSize') }
-      );
-
-      // Custom variant
-      addVariant('hocus', ['&:hover', '&:focus']);
-
-      // Component
-      addComponents({
-        '.btn': {
-          padding: theme('spacing.4'),
-          borderRadius: theme('borderRadius.md'),
+        '.text-shadow': {
+          'text-shadow': '1px 1px 2px rgba(0,0,0,0.4)',
         },
       });
     }),
@@ -702,330 +582,544 @@ module.exports = {
 };
 ```
 
-In v4, plugins are CSS-based: `@plugin "...";` plus `@utility` for custom utilities.
+```html
+<h1 class="text-shadow">Shadowed</h1>
+```
 
 ---
 
-## Tailwind v4
+## 8. Tailwind v4
 
-### Q30. What's new in Tailwind v4?
+## Q30. What's new in Tailwind v4?
 
 **Answer:**
 
-| Feature | v3 | v4 |
-|---------|----|----|
-| Config | `tailwind.config.js` | CSS-first via `@theme` |
-| Engine | PostCSS-based | Oxide (Rust) — much faster |
-| Setup | `@tailwind base/components/utilities` | Single `@import "tailwindcss"` |
-| CSS variables | Optional | All theme values exposed as CSS vars by default |
-| Container queries | Plugin | Built-in |
-| `@starting-style`, color-mix, native cascade layers | Limited | First-class |
-| Browser target | Wide | Modern (Safari 16.4+, Chrome 111+) |
-| Dynamic utility values | Limited | Most utilities accept arbitrary values without brackets in some cases |
-| Build speed | Fast | 5–10× faster |
+Tailwind v4 (released 2024) brings:
 
----
+- CSS-first configuration with `@theme` (less reliance on JS config).
+- A new high-performance Oxide engine.
+- Native CSS variables for design tokens, available at runtime.
+- Container queries built in.
+- Simpler install — no PostCSS config needed for many projects.
 
-### Q31. How does the v4 CSS-first config work?
+## Q31. How does the v4 CSS-first config work?
 
 **Answer:**
 
 ```css
+/* app.css (v4) */
 @import "tailwindcss";
 
 @theme {
-  --color-brand: oklch(64% 0.22 264);
-  --color-brand-dark: oklch(54% 0.22 264);
-  --font-display: "Inter Variable", sans-serif;
-  --spacing: 0.25rem; /* base unit */
-  --breakpoint-3xl: 120rem;
+  --color-brand-500: #3b82f6;
+  --font-display: "Inter", sans-serif;
+  --spacing-128: 32rem;
 }
-
-@layer base {
-  html { color-scheme: light dark; }
-}
-
-@plugin "@tailwindcss/typography";
-
-@source "../node_modules/some-lib/dist";
 ```
 
-Each `--color-*`, `--spacing-*`, `--font-*`, `--breakpoint-*` value automatically generates corresponding utilities (`bg-brand`, `font-display`, `3xl:flex`, etc.).
+```html
+<div class="bg-brand-500 font-display p-128">Hello</div>
+```
 
-No JS config needed for most projects. JS config still supported via `@config "./tailwind.config.js";`.
+Tokens are real CSS custom properties, so you can read them at runtime.
 
----
-
-### Q32. Are there migration concerns from v3 to v4?
-
-**Answer:**
-- **Browser support**: v4 requires modern browsers (Safari 16.4, Chrome 111, Firefox 128). Not backward compatible.
-- **Removed deprecated utilities** (`bg-opacity-*`, `text-opacity-*` — use `bg-black/50` syntax).
-- **Default color palette tweaked** (uses oklch for better gradients).
-- **`@tailwind` directives replaced** with `@import "tailwindcss"`.
-- **Default border color changed** from gray-200 to currentColor — explicitly add a color or set `--color-border-DEFAULT`.
-- **Ring default** changed from blue-500 to currentColor and 3px to 1px.
-- **Migration tool**: `npx @tailwindcss/upgrade@next`.
-
-Verify visual diffs in a staging environment before merging.
-
----
-
-## Patterns and Design Systems
-
-### Q33. How do you build a component library on Tailwind?
+## Q32. Are there migration concerns from v3 to v4?
 
 **Answer:**
-1. Define design tokens in theme (colors, spacing, radii, shadows, fonts).
-2. Build atomic components (Button, Input, Card) using utilities + `cva` for variants.
-3. Use Headless UI / Radix for behavioral primitives.
-4. Wrap with `tailwind-merge` for override-friendly `className` props.
-5. Export typed variants and provide Storybook coverage.
-6. Include the library's source files in consumers' `content` glob (or distribute compiled CSS).
 
-shadcn/ui's "copy-paste rather than install" model is popular — components live in your repo and you customize freely.
+Yes — some classes were renamed or removed (e.g. `decoration-clone` → `box-decoration-clone`), some defaults changed (default border color became `currentColor`), and the configuration format moved to CSS. There is an official upgrade tool (`npx @tailwindcss/upgrade`) that automates most changes.
 
 ---
 
-### Q34. How do you handle responsive grid patterns?
+## 9. Patterns and Design Systems
+
+## Q33. How do you build a component library on Tailwind?
+
+**Answer:**
+
+- Define design tokens in the config.
+- Build framework components (React/Vue) that compose utilities internally.
+- Use `tailwind-merge` + `cva` for variant APIs.
+- Document each component with examples.
+
+```jsx
+import { cva } from 'class-variance-authority';
+import { twMerge } from 'tailwind-merge';
+
+const card = cva('rounded-lg border bg-white shadow-sm', {
+  variants: { padding: { sm: 'p-3', md: 'p-6', lg: 'p-8' } },
+});
+
+export function Card({ padding, className, ...props }) {
+  return <div className={twMerge(card({ padding }), className)} {...props} />;
+}
+```
+
+## Q34. How do you handle responsive grid patterns?
 
 **Answer:**
 
 ```html
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-```
-
-Auto-fit/fill via arbitrary values:
-```html
-<div class="grid gap-4 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
-```
-
-Container queries (v4 built-in / v3 plugin):
-```html
-<div class="@container">
-  <div class="grid grid-cols-1 @md:grid-cols-2 @lg:grid-cols-3">
+  <div class="bg-white rounded-lg p-4">Item</div>
+  <div class="bg-white rounded-lg p-4">Item</div>
+  <div class="bg-white rounded-lg p-4">Item</div>
 </div>
 ```
 
----
+For an "auto-fit" responsive grid without breakpoints:
 
-### Q35. How do you build a card component?
+```html
+<div class="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-4">
+  ...
+</div>
+```
+
+## Q35. How do you build a card component?
+
+**Answer:**
+
+```html
+<article class="overflow-hidden rounded-lg bg-white shadow-md transition hover:shadow-lg">
+  <img src="cover.jpg" class="aspect-video w-full object-cover" alt="" />
+  <div class="p-4">
+    <h3 class="text-lg font-semibold">Card title</h3>
+    <p class="mt-2 text-sm text-gray-600">A short description...</p>
+    <a href="#" class="mt-4 inline-block text-blue-600 hover:underline">Read more</a>
+  </div>
+</article>
+```
+
+## Q36. How do you build a navbar with mobile menu?
 
 **Answer:**
 
 ```jsx
-function Card({ title, body, footer, className }) {
+function Nav() {
+  const [open, setOpen] = useState(false);
   return (
-    <article className={cn(
-      'bg-white dark:bg-gray-800',
-      'border border-gray-200 dark:border-gray-700',
-      'rounded-lg shadow-sm hover:shadow-md transition',
-      'p-6 flex flex-col gap-4',
-      className
-    )}>
-      <h3 className="text-lg font-semibold">{title}</h3>
-      <p className="text-gray-600 dark:text-gray-300 text-sm">{body}</p>
-      {footer && <div className="mt-auto pt-4 border-t">{footer}</div>}
-    </article>
+    <nav className="bg-white shadow">
+      <div className="mx-auto max-w-6xl flex items-center justify-between p-4">
+        <a className="font-bold">Logo</a>
+        <button
+          className="md:hidden"
+          onClick={() => setOpen(!open)}
+        >
+          ☰
+        </button>
+        <ul className="hidden md:flex gap-6">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+      </div>
+      {open && (
+        <ul className="md:hidden border-t p-4 space-y-2">
+          <li><a href="/">Home</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+      )}
+    </nav>
   );
 }
 ```
 
-Pattern: structural utilities first (display/spacing), then color, then state, then layout-affecting modifiers.
-
----
-
-### Q36. How do you build a navbar with mobile menu?
-
-**Answer:**
-
-```jsx
-<nav className="bg-white border-b">
-  <div className="max-w-7xl mx-auto px-4 flex items-center justify-between h-16">
-    <Logo className="h-8" />
-    <div className="hidden md:flex gap-6">
-      <a href="/products" className="hover:text-blue-600">Products</a>
-      <a href="/pricing" className="hover:text-blue-600">Pricing</a>
-    </div>
-    <button className="md:hidden" onClick={() => setOpen(!open)} aria-label="Menu">
-      <MenuIcon />
-    </button>
-  </div>
-  {open && (
-    <div className="md:hidden border-t px-4 py-3 space-y-2">
-      <a href="/products" className="block">Products</a>
-      <a href="/pricing" className="block">Pricing</a>
-    </div>
-  )}
-</nav>
-```
-
-Use `Disclosure` from Headless UI for accessible state management.
-
----
-
-### Q37. How do you create gradients?
+## Q37. How do you create gradients?
 
 **Answer:**
 
 ```html
-<div class="bg-gradient-to-r from-pink-500 via-red-500 to-yellow-500">
-<div class="bg-gradient-to-br from-slate-900 to-slate-700">
-<!-- with stops -->
-<div class="bg-gradient-to-r from-blue-500 from-10% via-purple-500 via-30% to-pink-500 to-90%">
-<!-- arbitrary -->
-<div class="bg-[radial-gradient(circle_at_top_left,_var(--tw-gradient-stops))] from-fuchsia-400 to-rose-500">
+<div class="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 p-8 text-white">
+  Gradient
+</div>
+
+<h1 class="bg-gradient-to-r from-blue-500 to-emerald-500 bg-clip-text text-transparent text-5xl font-bold">
+  Gradient text
+</h1>
 ```
 
-For text:
-```html
-<h1 class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-```
-
-In v4, conic and radial gradients are first-class utilities.
-
----
-
-### Q38. How do you do animations beyond transitions?
+## Q38. How do you do animations beyond transitions?
 
 **Answer:**
 
-Built-in: `animate-spin`, `animate-ping`, `animate-pulse`, `animate-bounce`.
+Tailwind ships with `animate-spin`, `animate-ping`, `animate-pulse`, `animate-bounce`. For custom animations, register in config.
 
-Custom keyframes:
 ```js
 theme: {
   extend: {
     keyframes: {
-      'fade-in-up': {
-        '0%': { opacity: '0', transform: 'translateY(10px)' },
-        '100%': { opacity: '1', transform: 'translateY(0)' },
+      'fade-up': {
+        '0%': { opacity: 0, transform: 'translateY(10px)' },
+        '100%': { opacity: 1, transform: 'translateY(0)' },
       },
     },
     animation: {
-      'fade-in-up': 'fade-in-up 0.3s ease-out',
+      'fade-up': 'fade-up 0.3s ease-out',
     },
   },
 }
 ```
 
 ```html
-<div class="animate-fade-in-up">
+<div class="animate-fade-up">Hello</div>
 ```
 
-Pair with `motion-safe:` and `motion-reduce:` to respect user preferences.
-
 ---
 
-## Comparisons and Trade-offs
+## 10. Comparisons and Trade-offs
 
-### Q39. Tailwind vs CSS Modules — when to choose what?
+## Q39. Tailwind vs CSS Modules — when to choose what?
 
 **Answer:**
 
-| | Tailwind | CSS Modules |
-|---|----------|-------------|
-| Speed of development | Faster after learning curve | Slower, more naming |
-| HTML readability | Verbose | Clean (`className={s.title}`) |
-| Constraint enforcement | Built-in design scale | Requires discipline |
-| Refactoring | Delete markup → styles gone | Orphan classes accumulate |
-| File count | One stylesheet, all utilities | One per component |
-| Type safety | Via plugins | Native (typed CSS modules) |
-| RSC compatibility | Perfect | Perfect |
+- **Tailwind** — utility classes in markup, fast iteration, small bundle, design system built-in.
+- **CSS Modules** — scoped CSS files per component, traditional class-based, easier when porting existing CSS.
 
-For design-system-driven product UIs, Tailwind wins. For one-off heavily styled marketing pages or when designers own CSS, Modules are cleaner.
+Both can coexist. Many teams use Tailwind for layout and CSS Modules for component-specific complex styles.
 
----
-
-### Q40. Tailwind vs styled-components / Emotion?
+## Q40. Tailwind vs styled-components / Emotion?
 
 **Answer:**
 
-Tailwind is build-time, zero-runtime; styled-components inject styles at runtime (slower, larger bundle, doesn't play well with React Server Components).
+- **Tailwind** — zero runtime, smaller bundle, works with any framework.
+- **styled-components / Emotion** — dynamic styles via JS props, but adds runtime cost and React Server Component compatibility issues.
 
-Tailwind constrains you to a design scale; styled-components is unbounded (good and bad).
+For modern React (App Router, RSC), Tailwind is usually safer.
 
-For new React 19/Next.js App Router projects, Tailwind or zero-runtime CSS-in-JS (vanilla-extract, Panda CSS) are the recommended choices over styled-components.
-
----
-
-### Q41. Common Tailwind anti-patterns?
+## Q41. Common Tailwind anti-patterns?
 
 **Answer:**
 
-1. **Recreating component classes via `@apply`** — defeats the purpose. Use template/component partials.
-2. **String-interpolating utility names** — `bg-${color}-500` won't be detected.
-3. **Overusing `safelist`** — bloats output.
-4. **Tons of arbitrary values** — sign you should extend the theme.
-5. **Ignoring `tailwind-merge`** when accepting `className` props — leads to unpredictable overrides.
-6. **No design tokens** — directly using `red-500` instead of `danger`. Hard to rebrand.
-7. **Skipping accessibility** — `<div onClick>` styled like a button. Tailwind doesn't make it a button.
-8. **Forgetting Preflight implications** — headings look unstyled by default; explicitly style them or use `prose`.
+- Repeating the same long class string everywhere instead of making a component.
+- Heavy `@apply` use — defeats the utility-first model.
+- Building class names dynamically with template strings (the scanner does not see partial class names).
+- Adding arbitrary values when a design token would do.
 
----
+```jsx
+// Bad — scanner can't see the class name
+<div className={`bg-${color}-500`} />
 
-### Q42. How do you debug missing or unexpected styles?
+// Good
+const map = { red: 'bg-red-500', green: 'bg-green-500' };
+<div className={map[color]} />
+```
 
-**Answer:**
-- Check `content` globs cover the file — common cause for "my class doesn't apply".
-- Look in DevTools "Computed" pane: is the class even in the stylesheet?
-- Confirm class is a literal string in source, not constructed dynamically.
-- Restart the dev server after config changes (some setups don't watch the config).
-- Check class order conflicts — Tailwind's source order: `width` after `w-1/2` may surprise; use `tailwind-merge`.
-- Verify variant gating: `md:flex` only applies above 768px.
-- For specificity issues with third-party CSS, raise Tailwind's layer priority or use `!` important variant: `!text-red-500`.
-
----
-
-### Q43. How does Tailwind handle right-to-left (RTL)?
+## Q42. How do you debug missing or unexpected styles?
 
 **Answer:**
+
+- Inspect the element in DevTools and check whether the class is in the generated CSS.
+- Confirm the file is in the `content` glob.
+- Check for class-name string interpolation that hides class names.
+- Look for conflicting classes — use `tailwind-merge`.
+
+## Q43. How does Tailwind handle right-to-left (RTL)?
+
+**Answer:**
+
+Use logical properties (`ms-`, `me-` for margin-start/end, `ps-`, `pe-` for padding-start/end, `start-` and `end-` for positioning).
 
 ```html
-<html dir="rtl">
-<div class="ml-4">      <!-- still left margin in RTL — wrong -->
-<div class="ms-4">      <!-- margin-inline-start — correct -->
+<div class="ms-4 ps-2 border-s">RTL-friendly</div>
 ```
 
-Use **logical** utilities: `ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `border-s`, `border-e`, etc.
+For pages with `dir="rtl"`, layout flips automatically.
 
-Conditional styles via `rtl:` and `ltr:` modifiers:
-```html
-<div class="rtl:rotate-180">
-```
-
----
-
-### Q44. How do you handle print styles?
+## Q44. How do you handle print styles?
 
 **Answer:**
 
+Use the `print:` modifier.
+
 ```html
-<button class="print:hidden">Buy now</button>
-<div class="hidden print:block">Confidential — Internal Use</div>
-<article class="print:text-black print:bg-white">
+<button class="print:hidden">Save PDF</button>
+<article class="print:text-black print:bg-white">Content</article>
 ```
 
-For dedicated print stylesheets, define a `print` screen variant:
+## Q45. How do you integrate Tailwind in a monorepo?
+
+**Answer:**
+
+Each app gets its own Tailwind config but can share the theme via a package.
+
 ```js
-screens: { print: { raw: 'print' } }
+// packages/ui/tailwind.preset.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: { brand: { 500: '#3b82f6' } },
+    },
+  },
+};
+
+// apps/web/tailwind.config.js
+module.exports = {
+  presets: [require('ui/tailwind.preset')],
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    '../../packages/ui/src/**/*.{js,ts,jsx,tsx}', // include shared package
+  ],
+};
 ```
 
 ---
 
-### Q45. How do you integrate Tailwind in a monorepo?
+## 11. More Practical Topics
+
+## Q46. How do you build a responsive button group?
 
 **Answer:**
-- Each app has its own `tailwind.config.js` and `content` paths
-- Shared UI package is included in each app's content glob:
-  ```js
-  content: ['./src/**/*.{tsx}', '../../packages/ui/src/**/*.{tsx}']
-  ```
-- Theme tokens shared via a JS module:
-  ```js
-  // packages/tailwind-config/index.js
-  module.exports = { theme: { extend: { colors: { brand: '...' } } } };
-  // app config
-  presets: [require('@org/tailwind-config')]
-  ```
-- In v4, share `@theme` via importable CSS files: `@import "@org/tailwind-config/theme.css";`
+
+```html
+<div class="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:divide-x rounded-md shadow-sm">
+  <button class="px-4 py-2 bg-white sm:rounded-l-md">Day</button>
+  <button class="px-4 py-2 bg-white">Week</button>
+  <button class="px-4 py-2 bg-white sm:rounded-r-md">Month</button>
+</div>
+```
+
+## Q47. How do you make a sticky header with shadow on scroll?
+
+**Answer:**
+
+```html
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur shadow-sm">
+  <div class="max-w-6xl mx-auto p-4">Header</div>
+</header>
+```
+
+The `backdrop-blur` plus translucent background gives a modern frosted-glass effect.
+
+## Q48. How do you build a form with validation states?
+
+**Answer:**
+
+```html
+<form class="space-y-4">
+  <div>
+    <label class="block text-sm font-medium">Email</label>
+    <input
+      type="email"
+      class="mt-1 w-full rounded border-gray-300
+             focus:border-blue-500 focus:ring-blue-500
+             invalid:border-red-500 invalid:focus:border-red-500"
+    />
+  </div>
+  <button class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
+    Submit
+  </button>
+</form>
+```
+
+## Q49. How do you implement an aspect-ratio container?
+
+**Answer:**
+
+```html
+<div class="aspect-video bg-gray-200">
+  <iframe src="..." class="w-full h-full" />
+</div>
+
+<div class="aspect-square bg-gray-200">Square</div>
+<div class="aspect-[4/3] bg-gray-200">Custom</div>
+```
+
+## Q50. How do you build a skeleton loader?
+
+**Answer:**
+
+```html
+<div class="animate-pulse space-y-3">
+  <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+  <div class="h-4 bg-gray-200 rounded"></div>
+  <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+</div>
+```
+
+## Q51. How do you use `space-x` and `space-y`?
+
+**Answer:**
+
+`space-x-*` and `space-y-*` add margin between adjacent children, replacing the need for individual margins.
+
+```html
+<div class="flex space-x-4">
+  <button>One</button>
+  <button>Two</button>
+  <button>Three</button>
+</div>
+
+<div class="space-y-2">
+  <p>Para 1</p>
+  <p>Para 2</p>
+</div>
+```
+
+In modern Tailwind, `gap-*` on flex/grid containers is generally preferred.
+
+## Q52. How do you build a tooltip?
+
+**Answer:**
+
+```html
+<div class="group relative inline-block">
+  <button>Hover me</button>
+  <div class="invisible group-hover:visible absolute bottom-full mb-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white">
+    Tooltip text
+  </div>
+</div>
+```
+
+## Q53. How do you center a modal?
+
+**Answer:**
+
+```html
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+  <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+    <h2 class="text-lg font-semibold">Modal</h2>
+    <p class="mt-2 text-sm text-gray-600">Content</p>
+  </div>
+</div>
+```
+
+## Q54. What is the difference between `min-w-0` and overflow?
+
+**Answer:**
+
+By default, flex items have a minimum content size that prevents them from shrinking. `min-w-0` allows them to shrink so child overflow rules (like text truncation) work.
+
+```html
+<div class="flex">
+  <div class="min-w-0 truncate">Very long text that needs to truncate properly</div>
+</div>
+```
+
+## Q55. How do you handle container width and centering?
+
+**Answer:**
+
+```html
+<div class="max-w-6xl mx-auto px-4">Centered content</div>
+```
+
+Or use Tailwind's `container` class plus `mx-auto`:
+
+```html
+<div class="container mx-auto px-4">Container</div>
+```
+
+## Q56. How do you create a divider with text?
+
+**Answer:**
+
+```html
+<div class="flex items-center gap-4">
+  <hr class="flex-1 border-gray-300" />
+  <span class="text-sm text-gray-500">OR</span>
+  <hr class="flex-1 border-gray-300" />
+</div>
+```
+
+## Q57. What are utility classes for accessibility?
+
+**Answer:**
+
+- `sr-only` — visually hidden but accessible to screen readers.
+- `not-sr-only` — undo `sr-only` (for visible-on-focus links).
+- `focus:outline-none` — be careful, always pair with a visible focus style.
+- `focus-visible:` — apply focus styles only with keyboard.
+
+```html
+<a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 bg-white px-4 py-2">
+  Skip to content
+</a>
+
+<button class="focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-500">
+  Click
+</button>
+```
+
+## Q58. How do you compose conditional classes in React?
+
+**Answer:**
+
+Use template literals or libraries like `clsx` / `classnames`.
+
+```jsx
+import clsx from 'clsx';
+
+<button
+  className={clsx(
+    'px-4 py-2 rounded font-medium',
+    isPrimary ? 'bg-blue-500 text-white' : 'bg-gray-200',
+    disabled && 'opacity-50 pointer-events-none'
+  )}
+>
+  Click
+</button>
+```
+
+For deduplication, use `clsx` + `tailwind-merge`:
+
+```jsx
+import { twMerge } from 'tailwind-merge';
+twMerge(clsx('p-2', condition && 'p-4'));
+```
+
+## Q59. How do you handle mobile-first design in Tailwind?
+
+**Answer:**
+
+Tailwind is mobile-first by default. Unprefixed utilities apply at all sizes; breakpoint prefixes (`md:`, `lg:`) add styles at that size and above.
+
+```html
+<!-- Mobile: stacked, Desktop: row -->
+<div class="flex flex-col md:flex-row">...</div>
+
+<!-- Mobile: smaller text, Desktop: larger -->
+<h1 class="text-2xl md:text-4xl lg:text-6xl">Heading</h1>
+```
+
+## Q60. How do you preview Tailwind classes during development?
+
+**Answer:**
+
+Install the official "Tailwind CSS IntelliSense" VS Code extension. It autocompletes class names, shows hover previews of the CSS, and highlights conflicts.
+
+---
+
+## 12. Quick Reference
+
+| Layout | Class |
+| ------ | ----- |
+| Flex container | `flex` |
+| Grid container | `grid grid-cols-3` |
+| Center children | `flex items-center justify-center` |
+| Gap | `gap-4` |
+| Padding/margin | `p-4` `m-4` `px-4` `mx-auto` |
+
+| Responsiveness | Modifier |
+| -------------- | -------- |
+| Tablet+ | `md:` |
+| Desktop+ | `lg:` |
+| Hover | `hover:` |
+| Focus | `focus:` |
+| Dark mode | `dark:` |
+| Group state | `group-hover:` |
+| Sibling state | `peer-checked:` |
+| Has child | `has-[:checked]:` |
+
+| Theming | Where |
+| ------- | ----- |
+| v3 | `tailwind.config.js → theme.extend` |
+| v4 | CSS `@theme { --color-brand-500: ... }` |
+| Tokens | `colors`, `spacing`, `boxShadow`, `borderRadius` |
+
+| Tools | Purpose |
+| ----- | ------- |
+| `tailwind-merge` | Resolve class conflicts |
+| `clsx` / `classnames` | Build conditional classes |
+| `class-variance-authority` | Variant API |
+| `@tailwindcss/typography` | Style raw HTML content |
+| `@tailwindcss/forms` | Reset form controls |
+| `Headless UI` | Accessible primitives |

@@ -1,94 +1,101 @@
 # CI/CD and GitHub Actions Interview Questions
 
-**Level:** Mid to Senior
-**Topics:** CI/CD Concepts, GitHub Actions, Pipelines, Security (OIDC), Caching, Matrix, Reusable Workflows, Deployment Strategies
+A practical, teaching-style Q&A guide for CI/CD with a focus on GitHub Actions. Each question gives a plain-language explanation followed by a working YAML workflow example.
 
 ---
 
 ## Table of Contents
 
-1. [CI/CD Fundamentals](#cicd-fundamentals)
-2. [GitHub Actions Architecture](#github-actions-architecture)
-3. [Workflow YAML Essentials](#workflow-yaml-essentials)
-4. [Triggers](#triggers)
-5. [Matrix and Parallelism](#matrix-and-parallelism)
-6. [Caching and Artifacts](#caching-and-artifacts)
-7. [Reusable Workflows and Composite Actions](#reusable-workflows-and-composite-actions)
-8. [Secrets, Environments, and OIDC](#secrets-environments-and-oidc)
-9. [Self-Hosted Runners](#self-hosted-runners)
-10. [Build, Test, Deploy Patterns](#build-test-deploy-patterns)
-11. [Container Builds in CI](#container-builds-in-ci)
-12. [Deployment Strategies](#deployment-strategies)
-13. [Comparison with Other CI Systems](#comparison-with-other-ci-systems)
-14. [Troubleshooting and Best Practices](#troubleshooting-and-best-practices)
+1. CI/CD Fundamentals
+2. GitHub Actions Architecture
+3. Workflow YAML Essentials
+4. Triggers
+5. Matrix and Parallelism
+6. Caching and Artifacts
+7. Reusable Workflows and Composite Actions
+8. Secrets, Environments, and OIDC
+9. Self-Hosted Runners
+10. Build, Test, Deploy Patterns
+11. Container Builds in CI
+12. Deployment Strategies
+13. Comparison with Other CI Systems
+14. Troubleshooting and Best Practices
 
 ---
 
-## CI/CD Fundamentals
+## 1. CI/CD Fundamentals
 
-### Q1. CI vs CD vs Continuous Deployment?
+## Q1. What is the difference between CI, CD, and Continuous Deployment?
 
 **Answer:**
 
-| Term | Meaning |
-|------|---------|
-| **Continuous Integration (CI)** | Developers merge to a shared branch frequently; each merge triggers automated build + tests. |
-| **Continuous Delivery (CD)** | Every change that passes CI is deployable; deployment is a manual button. |
-| **Continuous Deployment** | Every passing change is automatically deployed to production. |
+- **Continuous Integration (CI)** means every change is automatically built and tested as soon as it is pushed. The goal is to catch problems early.
+- **Continuous Delivery (CD)** means every change that passes CI is automatically packaged and made ready to deploy. A human still clicks "deploy."
+- **Continuous Deployment** goes one step further: every change that passes is automatically deployed to production with no human in the loop.
 
-CI gives fast feedback. CD reduces release risk. Continuous Deployment maximizes velocity.
+| Term                  | Auto-test? | Auto-package? | Auto-deploy?      |
+| --------------------- | ---------- | ------------- | ----------------- |
+| CI                    | Yes        | No            | No                |
+| Continuous Delivery   | Yes        | Yes           | No (manual click) |
+| Continuous Deployment | Yes        | Yes           | Yes               |
 
----
-
-### Q2. Why CI/CD?
-
-**Answer:**
-- Catch bugs early (cheaper to fix).
-- Smaller, frequent releases reduce risk.
-- Repeatable builds — the pipeline is the source of truth.
-- Faster feedback to developers.
-- Auditable history of what shipped, when, by whom.
-- Enables trunk-based development with confidence.
-
----
-
-### Q3. What is a pipeline?
+## Q2. Why CI/CD?
 
 **Answer:**
-A series of automated stages a code change passes through — typically lint → test → build → security scan → deploy. Pipelines are defined as code (YAML), versioned with the project, and reproducible.
+
+1. **Catch bugs early** — failures show up on every commit, not at release time.
+2. **Faster releases** — automated pipelines remove manual toil.
+3. **Confidence** — passing tests on every PR makes refactors safe.
+4. **Audit trail** — every build, test, and deploy is logged.
+5. **Consistency** — the same pipeline runs in dev and prod, so "works on my machine" disappears.
+
+## Q3. What is a pipeline?
+
+**Answer:**
+
+A pipeline is the sequence of stages a change goes through from commit to production. A typical pipeline:
+
+```text
+Lint -> Build -> Unit tests -> Integration tests -> Security scan -> Package -> Deploy staging -> Smoke tests -> Deploy production
+```
+
+Each stage either passes or stops the pipeline. Pipelines can run stages in parallel where there are no dependencies.
+
+## Q4. What are common pipeline anti-patterns?
+
+**Answer:**
+
+1. **Slow pipelines** — devs stop trusting CI when it takes 40 minutes.
+2. **Flaky tests** — random failures train people to "click retry."
+3. **Manual deploys after CI** — defeats the purpose of automation.
+4. **Long-lived secrets** — long-lived cloud credentials are a security risk; use OIDC.
+5. **No environments** — pushing straight to prod with no staging.
+6. **No rollback plan** — when prod breaks, panic.
+7. **Building on every push to every branch** — wastes minutes; use path filters and concurrency control.
 
 ---
 
-### Q4. Pipeline anti-patterns?
+## 2. GitHub Actions Architecture
 
-- Long, slow pipelines (>15 min) — developers context-switch and lose flow.
-- Flaky tests left unchecked — eroded trust → ignored failures.
-- Secrets in plaintext logs.
-- Manual steps in deployment ("just SSH in and run X").
-- One giant job — no parallelism, hard to debug.
-- No environment parity (dev passes, prod breaks).
-- No rollback strategy.
+## Q5. What are the core concepts in GitHub Actions?
 
----
+**Answer:**
 
-## GitHub Actions Architecture
+| Concept    | Meaning                                                                |
+| ---------- | ---------------------------------------------------------------------- |
+| Workflow   | A YAML file in `.github/workflows/` that defines automation            |
+| Event      | What triggers the workflow (push, PR, schedule, manual, etc.)          |
+| Job        | A set of steps that run on the same runner                             |
+| Step       | A single command or "action" within a job                              |
+| Action     | A reusable unit of code (e.g., `actions/checkout`)                     |
+| Runner     | The machine that executes the job (GitHub-hosted or self-hosted)       |
 
-### Q5. Core concepts?
+## Q6. Show me a skeleton workflow.
 
-| Concept | Description |
-|---------|-------------|
-| **Workflow** | YAML file under `.github/workflows/`; contains jobs. |
-| **Job** | A unit that runs on a runner; has steps. |
-| **Step** | Single command or action invocation. |
-| **Action** | Reusable unit (Docker, JavaScript, or composite). |
-| **Runner** | Machine that executes the job (GitHub-hosted or self-hosted). |
-| **Event** | Trigger (push, PR, schedule, manual, etc.). |
-
----
-
-### Q6. Skeleton workflow?
+**Answer:**
 
 ```yaml
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -101,155 +108,192 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: 20
+          cache: npm
+
       - run: npm ci
       - run: npm test
 ```
 
----
+This runs on every push to `main` and on every PR. It checks out the code, sets up Node 20, installs dependencies, and runs tests.
 
-### Q7. Job dependencies?
+## Q7. How do job dependencies work?
+
+**Answer:**
+
+Use `needs:` to make one job wait for another. Without `needs`, jobs run in parallel.
 
 ```yaml
 jobs:
   lint:
     runs-on: ubuntu-latest
-    steps: [...]
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run lint
 
   test:
     runs-on: ubuntu-latest
-    needs: lint
-    steps: [...]
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm test
 
   deploy:
-    runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, test]            # only run if both pass
     if: github.ref == 'refs/heads/main'
-    steps: [...]
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh
 ```
-
-By default, jobs run in parallel. `needs:` enforces order. `if:` adds conditions.
 
 ---
 
-## Workflow YAML Essentials
+## 3. Workflow YAML Essentials
 
-### Q8. Expressions and contexts?
+## Q8. What are expressions and contexts?
+
+**Answer:**
+
+Expressions in `${{ ... }}` evaluate at runtime. Contexts are objects you can read from inside expressions.
+
+| Context        | Examples                                                  |
+| -------------- | --------------------------------------------------------- |
+| `github`       | `github.actor`, `github.ref`, `github.event_name`         |
+| `env`          | environment variables                                     |
+| `secrets`      | `secrets.AWS_ROLE_ARN`                                    |
+| `matrix`       | values from a matrix strategy                             |
+| `steps`        | outputs from previous steps                               |
+| `needs`        | outputs from previous jobs                                |
 
 ```yaml
-- if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  run: echo "deploy"
+- name: Print info
+  run: |
+    echo "Triggered by: ${{ github.actor }}"
+    echo "Branch: ${{ github.ref_name }}"
+    echo "Event: ${{ github.event_name }}"
 
-- run: echo "PR #${{ github.event.pull_request.number }}"
-- run: echo "Actor: ${{ github.actor }}"
-- run: echo "Commit: ${{ github.sha }}"
+- name: Only on main
+  if: ${{ github.ref == 'refs/heads/main' }}
+  run: ./deploy.sh
 ```
 
-Common contexts: `github`, `env`, `secrets`, `vars`, `inputs`, `needs`, `matrix`, `runner`, `job`, `steps`.
+## Q9. How do you set environment variables and outputs?
 
----
-
-### Q9. Setting environment variables and outputs?
+**Answer:**
 
 ```yaml
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NODE_ENV: production
-    outputs:
-      version: ${{ steps.meta.outputs.version }}
+      NODE_ENV: production           # available to all steps in this job
     steps:
+      - name: Set env at runtime
+        run: echo "VERSION=1.2.3" >> $GITHUB_ENV
+
+      - name: Use it
+        run: echo "Version is $VERSION"
+
       - id: meta
-        run: echo "version=1.2.3" >> "$GITHUB_OUTPUT"
+        name: Produce an output
+        run: echo "sha-short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
-      - run: echo "FOO=bar" >> "$GITHUB_ENV"     # available to later steps
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "deploying ${{ needs.build.outputs.version }}"
+      - name: Use a step output
+        run: echo "Short SHA: ${{ steps.meta.outputs.sha-short }}"
 ```
 
-`set-output` and `set-env` echo commands were deprecated; use `$GITHUB_OUTPUT` and `$GITHUB_ENV` files.
-
----
-
-### Q10. Conditional steps and `continue-on-error`?
+To pass outputs between jobs:
 
 ```yaml
-- name: Lint
-  run: npm run lint
-  continue-on-error: true       # don't fail the job
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: echo "version=1.0.0" >> $GITHUB_OUTPUT
 
-- name: Notify on failure
-  if: failure()
-  run: ./notify.sh
-
-- name: Always run cleanup
-  if: always()
-  run: rm -rf /tmp/build
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Building ${{ needs.setup.outputs.version }}"
 ```
 
-Status functions: `success()`, `failure()`, `cancelled()`, `always()`.
+## Q10. How do conditional steps and `continue-on-error` work?
+
+**Answer:**
+
+```yaml
+steps:
+  - name: Always
+    run: echo "always runs"
+
+  - name: Only on main
+    if: github.ref == 'refs/heads/main'
+    run: ./deploy.sh
+
+  - name: Only on PR from same repo
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    run: ./run-integration-tests.sh
+
+  - name: Run anyway, ignore failure
+    continue-on-error: true
+    run: ./flaky-script.sh
+
+  - name: After a failure, run only on failure
+    if: failure()
+    run: ./notify-slack.sh
+```
+
+`failure()`, `success()`, `cancelled()`, and `always()` are useful status functions.
 
 ---
 
-## Triggers
+## 4. Triggers
 
-### Q11. Common triggers?
+## Q11. What are common triggers?
+
+**Answer:**
 
 ```yaml
 on:
   push:
-    branches: [main, 'release/**']
-    tags: ['v*']
-    paths-ignore: ['**.md', 'docs/**']
-
+    branches: [main, "release/*"]
+    paths: ["src/**", "!docs/**"]   # only when these paths change
   pull_request:
     types: [opened, synchronize, reopened]
-    branches: [main]
-
   schedule:
-    - cron: '0 2 * * *'        # daily 02:00 UTC
-
-  workflow_dispatch:
+    - cron: "0 6 * * *"             # daily at 06:00 UTC
+  workflow_dispatch:                # manual trigger from UI
     inputs:
       env:
         type: choice
         options: [staging, production]
-        default: staging
-
-  repository_dispatch:
-    types: [deploy-trigger]
-
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
+  release:
+    types: [published]
+  workflow_call:                    # callable from other workflows
 ```
 
----
+`workflow_dispatch` adds a "Run workflow" button on the Actions tab.
 
-### Q12. `pull_request` vs `pull_request_target`?
+## Q12. What is the difference between `pull_request` and `pull_request_target`?
 
 **Answer:**
 
-| | pull_request | pull_request_target |
-|---|---|---|
-| Code checked out | PR head (untrusted) | Base branch (trusted) |
-| Secrets available | Limited (none for forks) | Full |
-| Use case | CI on PR code | Adding labels, auto-merge from forks |
-| Risk | Low | High — can leak secrets if you check out PR code |
+- **`pull_request`** runs in the context of the *PR's* code. For PRs from forks, it runs with **read-only** `GITHUB_TOKEN` and **no** secrets. Safe for untrusted code.
+- **`pull_request_target`** runs in the context of the *base* repo. It has full secrets and write permissions. Dangerous to combine with checking out the PR's code, because that code could read your secrets.
 
-**Never** check out untrusted PR code in `pull_request_target` and run scripts from it. That's a common supply-chain attack vector.
+Rule: use `pull_request` for normal CI. Use `pull_request_target` only for tasks like labeling or commenting on PRs, and never check out the PR's code in it.
 
----
+## Q13. How does concurrency control work?
 
-### Q13. Concurrency control?
+**Answer:**
+
+`concurrency` cancels older runs of the same workflow on the same branch when a new one starts. This saves minutes when devs push rapidly.
 
 ```yaml
 concurrency:
@@ -257,116 +301,133 @@ concurrency:
   cancel-in-progress: true
 ```
 
-Cancels older runs of the same workflow + ref. For deploys, prefer queueing without cancellation:
-
-```yaml
-concurrency:
-  group: deploy-prod
-  cancel-in-progress: false
-```
+For deploy workflows you usually do *not* want to cancel — set `cancel-in-progress: false` so deploys queue.
 
 ---
 
-## Matrix and Parallelism
+## 5. Matrix and Parallelism
 
-### Q14. Matrix strategy?
+## Q14. What is the matrix strategy?
+
+**Answer:**
+
+A matrix runs the same job multiple times with different parameters. Great for testing across versions or operating systems.
 
 ```yaml
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node: [18, 20, 22]
-        include:
-          - os: ubuntu-latest
-            node: 22
-            coverage: true
         exclude:
           - os: windows-latest
             node: 18
+        include:
+          - os: ubuntu-latest
+            node: 20
+            extra: "with-coverage"
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '${{ matrix.node }}' }
-      - run: npm test
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm ci && npm test
 ```
 
-- `fail-fast: false` — let other matrix jobs continue even if one fails.
-- `include` / `exclude` — fine-tune combinations.
+`fail-fast: false` lets all matrix jobs finish so you can see all failures, not just the first.
 
----
+## Q15. How do you shard tests?
 
-### Q15. Sharding tests?
+**Answer:**
+
+Sharding splits a large test suite across N runners running in parallel.
 
 ```yaml
-strategy:
-  matrix:
-    shard: [1, 2, 3, 4]
-steps:
-  - run: npx jest --shard=${{ matrix.shard }}/4
+jobs:
+  test:
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - name: Run shard
+        run: npx jest --shard=${{ matrix.shard }}/4
 ```
 
-Splits the suite four ways across runners — quartering wall-clock time.
+The 4 shards run simultaneously, cutting wall time roughly 4x.
 
 ---
 
-## Caching and Artifacts
+## 6. Caching and Artifacts
 
-### Q16. Caching dependencies?
+## Q16. How do you cache dependencies?
+
+**Answer:**
+
+The `setup-*` actions usually have built-in caching:
 
 ```yaml
 - uses: actions/setup-node@v4
   with:
-    node-version: '20'
-    cache: 'npm'                     # built-in cache for package managers
-    cache-dependency-path: package-lock.json
+    node-version: 20
+    cache: npm                # or yarn, pnpm
+
+- uses: actions/setup-python@v5
+  with:
+    python-version: "3.12"
+    cache: pip
 ```
 
-Manual cache:
+For custom caches use `actions/cache`:
+
 ```yaml
 - uses: actions/cache@v4
   with:
     path: |
-      ~/.npm
-      .next/cache
-    key: ${{ runner.os }}-build-${{ hashFiles('**/package-lock.json') }}
+      ~/.cargo
+      target
+    key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     restore-keys: |
-      ${{ runner.os }}-build-
+      ${{ runner.os }}-cargo-
 ```
 
-`hashFiles` produces a stable key when lockfile is unchanged; `restore-keys` falls back to a partial match.
+`hashFiles` keys the cache by lockfile contents, so it invalidates only when dependencies change.
 
----
-
-### Q17. Cache scoping rules?
+## Q17. What are the cache scoping rules?
 
 **Answer:**
-- Caches are scoped to a branch.
-- Branches can read the default branch's cache (one-way).
-- Cache is evicted after 7 days of inactivity.
-- 10 GB limit per repo.
-- Don't cache mutable directories (`node_modules` directly) — cache the package manager's store and reinstall.
 
----
+- A cache created on a branch is available to that branch and its descendants.
+- The default branch (`main`) can write a "base" cache that PR branches can read.
+- Total cache storage per repo is limited (10 GB at the time of writing); GitHub evicts the least recently used.
 
-### Q18. Artifacts vs caches?
+PRs from forks have **read-only** access to caches.
 
-| | Cache | Artifact |
-|---|---|---|
-| Purpose | Speed up builds (deps) | Pass files between jobs / publish |
-| TTL | 7 days, 10 GB | 90 days (configurable) |
-| Cross-workflow | Yes (with limits) | No |
-| API | actions/cache | actions/upload-artifact |
+## Q18. What is the difference between artifacts and caches?
+
+**Answer:**
+
+| Feature  | Cache                                     | Artifact                                |
+| -------- | ----------------------------------------- | --------------------------------------- |
+| Purpose  | Speed up future runs                      | Persist a build output for later use    |
+| Lifespan | Up to 7 days unused, evicted by size      | Up to 90 days, configurable             |
+| Access   | Across runs of the same repo              | Across jobs in the same run, or download |
 
 ```yaml
 - uses: actions/upload-artifact@v4
   with:
     name: dist
     path: dist/
-    retention-days: 7
+    retention-days: 14
 
 - uses: actions/download-artifact@v4
   with:
@@ -374,269 +435,305 @@ Manual cache:
     path: dist/
 ```
 
+Use a cache for things you can rebuild (npm modules). Use an artifact for things you want to keep (the build output, test reports).
+
 ---
 
-## Reusable Workflows and Composite Actions
+## 7. Reusable Workflows and Composite Actions
 
-### Q19. Reusable workflow?
+## Q19. What is a reusable workflow?
+
+**Answer:**
+
+A reusable workflow is a workflow file that can be called from other workflows. Use it to share entire pipelines (e.g., a standard "build, test, scan" sequence) across repos.
 
 ```yaml
-# .github/workflows/build.yml
+# .github/workflows/build.yml — the reusable workflow
 on:
   workflow_call:
     inputs:
       node-version:
         type: string
-        default: '20'
+        default: "20"
     secrets:
       NPM_TOKEN:
         required: true
-    outputs:
-      artifact:
-        value: ${{ jobs.build.outputs.artifact }}
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    outputs:
-      artifact: dist
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '${{ inputs.node-version }}' }
+        with:
+          node-version: ${{ inputs.node-version }}
       - run: npm ci
-        env: { NODE_AUTH_TOKEN: '${{ secrets.NPM_TOKEN }}' }
-      - run: npm run build
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - run: npm test
 ```
 
-Caller:
+Call it:
+
 ```yaml
+# .github/workflows/ci.yml
 jobs:
   ci:
     uses: ./.github/workflows/build.yml
     with:
-      node-version: '22'
+      node-version: "20"
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
 
----
+## Q20. What is a composite action?
 
-### Q20. Composite action?
+**Answer:**
+
+A composite action bundles a sequence of steps you want to reuse across workflows in one place.
 
 ```yaml
 # .github/actions/setup/action.yml
-name: 'Setup project'
+name: "Setup"
+description: "Set up Node and install deps"
 inputs:
   node-version:
-    default: '20'
+    required: true
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
+    - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
-      with: { node-version: '${{ inputs.node-version }}' }
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
     - run: npm ci
       shell: bash
 ```
 
+Use it:
+
 ```yaml
 - uses: ./.github/actions/setup
-  with: { node-version: '22' }
+  with:
+    node-version: "20"
 ```
 
----
-
-### Q21. Reusable workflow vs composite action?
-
-| | Reusable workflow | Composite action |
-|---|---|---|
-| Granularity | Whole jobs | Steps within a job |
-| Runs on | Its own runner(s) | Caller's runner |
-| Secrets | Explicit pass-through | Inherits caller's |
-| Matrix | Supported | Not directly |
-| Use case | Whole pipelines (build, test, deploy) | DRY step sequences |
-
----
-
-### Q22. Custom action types?
-
-| Type | Implementation |
-|------|----------------|
-| **JavaScript** | Node.js code; fastest startup |
-| **Docker** | Container image; full env control; Linux-only on hosted runners |
-| **Composite** | YAML steps; no extra deps |
-
----
-
-## Secrets, Environments, and OIDC
-
-### Q23. Secrets handling?
+## Q21. Reusable workflow vs composite action — when do I choose which?
 
 **Answer:**
-- Define at repo, environment, or org level.
-- Reference: `${{ secrets.NAME }}`.
-- Masked in logs (but not when transformed — e.g., base64).
-- Not available to workflows triggered by PRs from forks.
-- Rotate regularly.
 
-```yaml
-- run: deploy.sh
-  env:
-    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-```
+| Aspect              | Reusable workflow            | Composite action            |
+| ------------------- | ---------------------------- | --------------------------- |
+| Scope               | Whole jobs                   | Steps within a job          |
+| Runs on             | Its own runner               | The calling job's runner    |
+| Has its own secrets | Yes (passed as `secrets:`)   | Inherits caller's           |
+| Best for            | Sharing entire pipelines     | Sharing step sequences      |
+
+## Q22. What types of custom actions exist?
+
+**Answer:**
+
+1. **JavaScript actions** — run on Node, cross-platform.
+2. **Docker container actions** — run in a Docker container; Linux runners only.
+3. **Composite actions** — combine other actions and shell commands.
+
+JS and composite actions are the most common.
 
 ---
 
-### Q24. Environments and approvals?
+## 8. Secrets, Environments, and OIDC
+
+## Q23. How are secrets handled?
+
+**Answer:**
+
+Secrets are encrypted values managed at the org, repo, or environment level. They are exposed to workflows as `${{ secrets.NAME }}` and are masked in logs.
+
+```yaml
+steps:
+  - run: ./deploy.sh
+    env:
+      AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+```
+
+Rules:
+- Never `echo` a secret directly.
+- Secrets are not passed to forked-PR workflows.
+- Prefer **OIDC** to long-lived cloud credentials.
+
+## Q24. What are environments and approvals?
+
+**Answer:**
+
+GitHub Environments group secrets and protection rules for a deployment target (staging, production). You can require approval, restrict to specific branches, and add a wait timer.
 
 ```yaml
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
+  deploy-prod:
     environment:
       name: production
-      url: https://app.example.com
+      url: https://example.com
+    runs-on: ubuntu-latest
     steps:
       - run: ./deploy.sh
+        env:
+          API_KEY: ${{ secrets.PROD_API_KEY }}
 ```
 
-Configure in repo Settings → Environments:
-- Required reviewers (manual approval gate).
-- Wait timer.
-- Branch restrictions (e.g., only `main` deploys to production).
-- Environment-scoped secrets and variables.
+Configure required reviewers and branch restrictions in the repo settings under **Environments**.
 
----
-
-### Q25. OIDC for cloud authentication?
+## Q25. How does OIDC for cloud authentication work?
 
 **Answer:**
-GitHub Actions can issue an OIDC token that AWS/Azure/GCP exchange for short-lived credentials — eliminating long-lived static keys.
+
+OIDC lets a workflow authenticate to AWS, GCP, Azure, etc. with a short-lived token, instead of storing static cloud credentials as secrets.
+
+The flow:
+1. GitHub issues a signed JWT identifying the workflow run.
+2. Your cloud provider verifies the JWT against GitHub's public keys.
+3. The cloud issues short-lived credentials (e.g., AWS STS tokens).
+
+AWS example:
 
 ```yaml
 permissions:
-  id-token: write
+  id-token: write              # required to request the OIDC token
   contents: read
 
-steps:
-  - uses: aws-actions/configure-aws-credentials@v4
-    with:
-      role-to-assume: arn:aws:iam::123456789012:role/GitHubDeployRole
-      aws-region: us-east-1
-
-  - run: aws s3 sync ./dist s3://my-bucket
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-deploy
+          aws-region: us-east-1
+      - run: aws s3 sync ./dist s3://my-bucket/
 ```
 
-The IAM role's trust policy validates `token.actions.githubusercontent.com` and limits to specific repo/branch/environment claims:
+You configure the IAM role with a trust policy that only accepts tokens from your specific GitHub org/repo/branch.
 
-```json
-"Condition": {
-  "StringLike": {
-    "token.actions.githubusercontent.com:sub": "repo:org/repo:environment:production"
-  }
-}
-```
+## Q26. Why use OIDC over static credentials?
 
----
+**Answer:**
 
-### Q26. Why OIDC over static credentials?
+1. **No long-lived keys** stored anywhere.
+2. **Short-lived tokens** — typically 1 hour.
+3. **Per-workflow scope** — the role can require the token to come from a specific repo and branch.
+4. **No rotation** to manage.
+5. **Audit trail** is rich (you can see which workflow assumed which role).
 
-- No secrets to rotate.
-- Tokens are short-lived (minutes).
-- Scoped to a specific workflow run.
-- Conditioned on branch/environment.
-- Auditable in cloud's IAM logs.
+## Q27. What are `permissions:` and the `GITHUB_TOKEN`?
 
----
+**Answer:**
 
-### Q27. `permissions:` and the `GITHUB_TOKEN`?
+Every workflow run gets an automatically-generated `GITHUB_TOKEN` to authenticate to the GitHub API. By default it has broad permissions; the principle of least privilege says you should set `permissions:` explicitly.
 
 ```yaml
 permissions:
-  contents: read
-  pull-requests: write
-  id-token: write
+  contents: read              # default everywhere
+  pull-requests: write        # to comment on PRs
+  packages: write             # to push to GHCR
+  id-token: write             # for OIDC
 ```
 
-Default permissions are configurable at org/repo level. Principle of least privilege — grant only what the workflow needs.
+You can set permissions at the workflow level (default) and override per-job.
 
----
-
-### Q28. Reviewing third-party actions?
+## Q28. How do you review third-party actions safely?
 
 **Answer:**
-1. Pin to a full commit SHA (not a tag — tags are mutable):
-   ```yaml
-   uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11   # v4.1.1
-   ```
-2. Audit the action's source.
-3. Prefer official `actions/*` and major vendors.
-4. Use Dependabot to keep them current:
-   ```yaml
-   # .github/dependabot.yml
-   version: 2
-   updates:
-     - package-ecosystem: "github-actions"
-       directory: "/"
-       schedule: { interval: "weekly" }
-   ```
-5. Restrict allowed actions at org level (Settings → Actions).
 
----
+A malicious action can read your secrets. To mitigate:
 
-### Q29. Branch protection rules?
+1. **Pin to a SHA** instead of a tag (tags are mutable).
+2. Prefer well-known, widely used actions (verified creators).
+3. Read the action's source.
+4. Keep actions up to date with Dependabot.
+
+```yaml
+# Bad: tag is mutable
+- uses: someorg/some-action@v1
+
+# Good: pinned to a specific commit
+- uses: someorg/some-action@a1b2c3d4e5f6...
+```
+
+## Q29. What are branch protection rules?
 
 **Answer:**
-- Require status checks to pass before merge.
-- Require PR reviews (1+, code owners).
-- Require linear history.
+
+Branch protection prevents direct pushes to important branches and enforces quality gates.
+
+Common settings for `main`:
+- Require pull request reviews (1 or more approvers).
+- Require status checks to pass (your CI workflows).
+- Require branches to be up to date.
 - Require signed commits.
-- Restrict who can push to protected branches.
-- Require up-to-date branches before merging.
+- Require linear history (no merge commits).
+- Restrict who can push.
 
-Combined with environment protection rules, these are the foundation of safe CD.
-
----
-
-## Self-Hosted Runners
-
-### Q30. Hosted vs self-hosted runners?
-
-| | GitHub-hosted | Self-hosted |
-|---|---|---|
-| Setup | Zero | Install runner agent |
-| Cost | Per-minute (free tier varies) | Your infra |
-| Customization | Limited | Full |
-| Secrets isolation | Strong (ephemeral VMs) | Your responsibility |
-| Use cases | Most projects | Special hardware (GPU, ARM), private network access, larger machines |
+Configure in **Settings → Branches → Branch protection rules**, or via Rulesets for org-wide policies.
 
 ---
 
-### Q31. Securing self-hosted runners?
+## 9. Self-Hosted Runners
 
-- **Never** use self-hosted runners for public repos with PRs from forks — attackers can run arbitrary code on them.
-- Use **ephemeral runners** (one-job lifetime) — `--ephemeral` flag.
-- Run runners in isolated networks/VPCs.
-- Run as least-privileged user.
-- Patch OS regularly.
-- Use Actions Runner Controller (ARC) on Kubernetes for autoscaling.
+## Q30. Hosted vs self-hosted runners — what is the difference?
+
+**Answer:**
+
+| Aspect          | GitHub-hosted                       | Self-hosted                           |
+| --------------- | ----------------------------------- | ------------------------------------- |
+| Setup           | Zero                                | You install and maintain the runner   |
+| Image           | Standard Ubuntu/Windows/macOS       | Whatever you build                    |
+| Cost            | Per minute (free tier for public)   | Your infra cost                       |
+| Network access  | Public internet                     | Your VPC; can reach private resources |
+| Hardware        | Fixed                               | You pick (GPUs, big RAM, etc.)        |
+| Ephemeral       | Yes (clean per job)                 | Configurable                          |
+
+Use self-hosted when you need private network access, custom hardware, or enormous CI volume.
+
+## Q31. How do you secure self-hosted runners?
+
+**Answer:**
+
+1. **Never** run self-hosted runners on public repos — anyone can run code on them via PRs.
+2. Use **ephemeral** runners (one job, then destroyed). Tools: Actions Runner Controller (ARC) on Kubernetes.
+3. Run with a non-privileged user; limit network egress.
+4. Patch the runner agent and the OS regularly.
+5. Use labels to scope which jobs can run on which runners.
+
+```yaml
+jobs:
+  build:
+    runs-on: [self-hosted, linux, gpu]
+```
 
 ---
 
-## Build, Test, Deploy Patterns
+## 10. Build, Test, Deploy Patterns
 
-### Q32. Standard CI pipeline?
+## Q32. Show me a standard CI pipeline.
+
+**Answer:**
 
 ```yaml
 name: CI
+
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
   pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   lint:
@@ -644,30 +741,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npm run lint
 
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env: { POSTGRES_PASSWORD: test }
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with: { node-version: 20, cache: npm }
       - run: npm ci
-      - run: npm test
-        env:
-          DATABASE_URL: postgres://postgres:test@localhost:5432/test
+      - run: npm test -- --coverage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
 
   build:
     needs: [lint, test]
@@ -675,398 +764,447 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '20', cache: 'npm' }
+        with: { node-version: 20, cache: npm }
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-artifact@v4
-        with: { name: dist, path: dist/ }
+        with:
+          name: dist
+          path: dist/
 ```
 
----
-
-### Q33. Service containers?
+## Q33. What are service containers?
 
 **Answer:**
-Sidecar containers attached to a job (databases, caches, queues for integration tests). Available via `localhost` inside the job (or by service name when the job runs in a container).
+
+Service containers are sidecar containers that run alongside your job — typically databases or message brokers used by integration tests.
 
 ```yaml
-services:
-  redis:
-    image: redis:7-alpine
-    ports: ['6379:6379']
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./run-integration-tests.sh
+        env:
+          DATABASE_URL: postgres://postgres:secret@localhost:5432/postgres
 ```
 
----
+The runner waits for the health check to pass before running steps.
 
-### Q34. Monorepo CI patterns?
+## Q34. What patterns work for monorepo CI?
 
 **Answer:**
-- **Path filtering** — only run jobs when relevant paths change:
-  ```yaml
-  on:
-    push:
-      paths: ['apps/web/**', '.github/workflows/web.yml']
-  ```
-- **Affected detection** — Nx, Turborepo, or Bazel compute changed projects.
-- **Reusable workflows** per project, dispatched from a top-level orchestrator.
-- **Cache** package manager stores per workspace.
-- **Parallel matrix** of affected projects.
+
+Monorepos benefit from running CI only for the parts that changed.
 
 ```yaml
-- name: Detect affected
-  id: affected
-  run: |
-    apps=$(npx nx show projects --affected --base=origin/main --json)
-    echo "apps=$apps" >> "$GITHUB_OUTPUT"
+on:
+  push:
+    paths:
+      - "packages/api/**"
+      - ".github/workflows/api.yml"
 
-- name: Run tests
-  if: steps.affected.outputs.apps != '[]'
-  run: npx nx run-many --target=test --projects=${{ steps.affected.outputs.apps }}
+jobs:
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cd packages/api && npm ci && npm test
 ```
+
+For more sophistication, use **dorny/paths-filter** or a tool like Nx/Turborepo that knows the dependency graph between packages.
+
+## Q35. How do you automate semantic versioning?
+
+**Answer:**
+
+Use **semantic-release**: it parses Conventional Commits, determines the next version, creates a tag, generates a changelog, and publishes.
+
+```yaml
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN:    ${{ secrets.NPM_TOKEN }}
+```
+
+A commit like `feat: add login` triggers a minor bump; `fix: handle null` triggers a patch; `feat!: drop Node 16` triggers a major.
 
 ---
 
-### Q35. Semantic versioning automation?
+## 11. Container Builds in CI
+
+## Q36. How do you build and push to GHCR?
+
+**Answer:**
 
 ```yaml
-release:
-  needs: build
-  runs-on: ubuntu-latest
-  permissions:
-    contents: write
-    issues: write
-    pull-requests: write
-  steps:
-    - uses: actions/checkout@v4
-      with: { fetch-depth: 0 }
-    - uses: actions/setup-node@v4
-      with: { node-version: '20', cache: 'npm' }
-    - run: npm ci
-    - run: npx semantic-release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+name: Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 ```
 
-`semantic-release` reads Conventional Commits, bumps versions, generates changelog, tags, and publishes.
+`type=gha` uses GitHub Actions' build cache — fast and free.
 
----
+## Q37. How do you push to AWS ECR with OIDC?
 
-## Container Builds in CI
-
-### Q36. Building and pushing to GHCR?
-
-```yaml
-build-image:
-  runs-on: ubuntu-latest
-  permissions:
-    contents: read
-    packages: write
-  steps:
-    - uses: actions/checkout@v4
-
-    - uses: docker/setup-qemu-action@v3
-    - uses: docker/setup-buildx-action@v3
-
-    - uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/${{ github.repository }}
-        tags: |
-          type=sha
-          type=ref,event=branch
-          type=semver,pattern={{version}}
-
-    - uses: docker/build-push-action@v5
-      with:
-        context: .
-        platforms: linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-```
-
-`type=gha` uses GitHub's caching backend for BuildKit — fast layer reuse across runs.
-
----
-
-### Q37. Pushing to AWS ECR with OIDC?
+**Answer:**
 
 ```yaml
 permissions:
   id-token: write
   contents: read
 
-steps:
-  - uses: actions/checkout@v4
-  - uses: aws-actions/configure-aws-credentials@v4
-    with:
-      role-to-assume: arn:aws:iam::123456789012:role/GitHubECRPush
-      aws-region: us-east-1
-  - uses: aws-actions/amazon-ecr-login@v2
-    id: ecr
-  - uses: docker/build-push-action@v5
-    with:
-      push: true
-      tags: ${{ steps.ecr.outputs.registry }}/myapp:${{ github.sha }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-ecr-push
+          aws-region: us-east-1
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/myapp:${{ github.sha }}
 ```
 
----
+No AWS keys are ever stored in GitHub.
 
-### Q38. Image scanning in CI?
+## Q38. How do you scan images in CI?
+
+**Answer:**
 
 ```yaml
-- uses: aquasecurity/trivy-action@master
+- name: Build image
+  uses: docker/build-push-action@v6
   with:
-    image-ref: ghcr.io/${{ github.repository }}:${{ github.sha }}
-    format: sarif
-    output: trivy.sarif
-    severity: 'CRITICAL,HIGH'
-    exit-code: '1'
+    context: .
+    load: true
+    tags: myapp:ci
 
-- uses: github/codeql-action/upload-sarif@v3
-  if: always()
+- name: Scan with Trivy
+  uses: aquasecurity/trivy-action@master
   with:
-    sarif_file: trivy.sarif
+    image-ref: myapp:ci
+    severity: HIGH,CRITICAL
+    exit-code: 1                       # fail the build on findings
+    ignore-unfixed: true
 ```
 
-Fails the build on CRITICAL/HIGH CVEs and surfaces results in GitHub's Security tab.
+Run scans on every push so vulnerabilities are caught before deploy.
 
 ---
 
-## Deployment Strategies
+## 12. Deployment Strategies
 
-### Q39. Rolling, blue-green, canary?
-
-| Strategy | How | Pros | Cons |
-|----------|-----|------|------|
-| **Rolling** | Replace pods/instances incrementally | Built-in (k8s, ECS), no extra cost | Mixed versions during deploy; long rollback |
-| **Blue-green** | Two stacks; switch traffic at the LB | Instant rollback; clean test | 2x cost during deploy |
-| **Canary** | Send small % to new version; ramp up | Real-world validation; gradual | Complex routing, monitoring |
-| **Recreate** | Stop all, start new | Simple | Downtime |
-
----
-
-### Q40. Canary deploy in GitHub Actions?
-
-```yaml
-deploy-canary:
-  runs-on: ubuntu-latest
-  environment: production
-  steps:
-    - run: ./deploy.sh --weight 10
-
-run-smoke-tests:
-  needs: deploy-canary
-  runs-on: ubuntu-latest
-  steps: [...]
-
-promote:
-  needs: run-smoke-tests
-  runs-on: ubuntu-latest
-  steps:
-    - run: ./deploy.sh --weight 100
-
-rollback:
-  if: failure()
-  needs: run-smoke-tests
-  runs-on: ubuntu-latest
-  steps:
-    - run: ./deploy.sh --weight 0 --rollback
-```
-
----
-
-### Q41. Rollback strategies?
+## Q39. Rolling, blue-green, canary — what are the differences?
 
 **Answer:**
-- **Re-deploy previous artifact** — pin every release to an immutable build (image digest).
-- **Database migrations** — design forward-compatible (expand → migrate → contract). Avoid breaking changes in a single release.
-- **Feature flags** — flip features off without redeploy.
-- **Traffic rollback** — revert weight in canary/blue-green.
-- **Auto-rollback** — wire SLO/error-rate monitoring (Prometheus alert → workflow_dispatch rollback).
 
----
+| Strategy   | How it works                                                | Rollback                        |
+| ---------- | ----------------------------------------------------------- | ------------------------------- |
+| Rolling    | Replace instances a few at a time                           | Continue rolling old version    |
+| Blue-green | Run two full environments; switch traffic in one step       | Switch traffic back             |
+| Canary     | Send small % of traffic to new version, increase gradually  | Stop sending traffic to canary  |
 
-### Q42. Feature flags integration?
+Rolling is simplest and the default for Kubernetes. Blue-green gives instant rollback. Canary lets you catch issues with minimal blast radius.
 
-**Answer:**
-Decouple deploy from release. Ship code dark, flip flags via LaunchDarkly, Unleash, Flagsmith, or Split.
-
-```yaml
-deploy:
-  steps:
-    - run: ./deploy.sh
-- run: curl -X POST $LD_API/flags/$FEATURE -d '{"enabled":true}'
-```
-
-Allows gradual rollout, per-tenant targeting, instant kill switch.
-
----
-
-### Q43. Deploying to Kubernetes?
-
-```yaml
-- uses: azure/setup-kubectl@v4
-- run: |
-    kubectl set image deployment/app \
-      app=ghcr.io/${{ github.repository }}:${{ github.sha }} \
-      --record
-    kubectl rollout status deployment/app --timeout=2m
-```
-
-For declarative deploys: GitOps with ArgoCD or Flux — CI builds and pushes images; the GitOps controller reconciles cluster state from a manifest repo.
-
----
-
-## Comparison with Other CI Systems
-
-### Q44. GitHub Actions vs GitLab CI vs Jenkins vs CircleCI vs Azure DevOps?
-
-| Aspect | GitHub Actions | GitLab CI | Jenkins | CircleCI | Azure DevOps |
-|--------|----------------|-----------|---------|----------|--------------|
-| Hosting | SaaS + self-hosted | SaaS + self-managed | Self-hosted (mostly) | SaaS + self-hosted | SaaS + self-hosted |
-| Config | YAML in repo | YAML in repo | Groovy (Jenkinsfile) | YAML in repo | YAML in repo |
-| Marketplace | Huge | Built-in templates | Plugins | Orbs | Tasks |
-| Tight VCS integration | GitHub | GitLab | Any | Any | Azure Repos / GitHub |
-| Secrets | Native + OIDC | Native + OIDC | Plugins | Native + OIDC | Native + OIDC |
-| Best for | GitHub repos, OSS | Self-managed GitLab | Legacy enterprise, custom needs | JS/JVM-heavy teams | Microsoft stack |
-
-Modern teams on GitHub overwhelmingly use Actions; GitLab teams use GitLab CI. Jenkins remains common in regulated/legacy environments.
-
----
-
-### Q45. Migrating from Jenkins to GitHub Actions?
-
-**Common pain points:**
-- Jenkinsfile (Groovy) → YAML (declarative).
-- Shared libraries → composite/reusable actions.
-- Plugins → marketplace actions or shell scripts.
-- Master-agent model → GitHub-hosted or self-hosted runners.
-- Long-running pipelines → chunked into parallel jobs.
-
----
-
-## Troubleshooting and Best Practices
-
-### Q46. Flaky CI — how to fix?
+## Q40. Show me a canary deploy in GitHub Actions.
 
 **Answer:**
-1. **Quarantine** flaky tests; track in an issue.
-2. **Identify causes**:
-   - Race conditions in parallel tests.
-   - Time/date dependencies.
-   - External services (mock or use `services:`).
-   - Order-dependent tests (randomize order).
-   - Resource contention on shared runners.
-3. **Retry** transient operations (network) — never retry to mask logic bugs.
-4. **Pin versions** (Node, system deps) to reduce drift.
-5. Use `ts/test-retry-action` only as a stopgap.
-6. Track flake rate as a metric; it's tech debt.
+
+```yaml
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy 10% canary
+        run: kubectl set image deploy/api api=myapp:${{ github.sha }} -n canary
+      - name: Wait and watch metrics
+        run: ./scripts/check-canary-metrics.sh
+      - name: Promote to 100%
+        if: success()
+        run: kubectl set image deploy/api api=myapp:${{ github.sha }}
+      - name: Roll back canary
+        if: failure()
+        run: kubectl rollout undo deploy/api -n canary
+```
+
+`./scripts/check-canary-metrics.sh` queries Prometheus for error rate and latency and exits non-zero if they regress.
+
+## Q41. What rollback strategies are common?
+
+**Answer:**
+
+1. **Re-deploy the previous artifact** — simple if your registry retains old images.
+2. **Kubectl rollout undo** — for Kubernetes, the easiest path.
+3. **DB migrations** — make migrations backward-compatible so the old code still runs.
+4. **Feature flags** — instead of rolling back code, flip the flag off.
+
+```bash
+kubectl rollout undo deployment/api
+kubectl rollout history deployment/api
+```
+
+## Q42. How do you integrate feature flags?
+
+**Answer:**
+
+Deploy code dark (behind a flag), then flip the flag separately. Decouple deploy from release.
+
+Tools: LaunchDarkly, Unleash, Flagsmith, or roll your own with a config service.
+
+```javascript
+if (flags.isEnabled("new-checkout", { userId })) {
+  return renderNewCheckout();
+}
+return renderOldCheckout();
+```
+
+A flagged rollout means rollback is a config change, not a redeploy.
+
+## Q43. How do you deploy to Kubernetes from GitHub Actions?
+
+**Answer:**
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/github-eks
+          aws-region: us-east-1
+
+      - run: aws eks update-kubeconfig --name prod-cluster
+
+      - run: |
+          kubectl set image deployment/api api=myapp:${{ github.sha }}
+          kubectl rollout status deployment/api --timeout=5m
+```
+
+For GitOps, push the new image tag to a Git repo and let Argo CD or Flux apply it.
 
 ---
 
-### Q47. Debugging a failing workflow?
+## 13. Comparison with Other CI Systems
+
+## Q44. GitHub Actions vs GitLab CI vs Jenkins vs CircleCI vs Azure DevOps?
+
+**Answer:**
+
+| System           | Strengths                                  | Weaknesses                            |
+| ---------------- | ------------------------------------------ | ------------------------------------- |
+| GitHub Actions   | Tight GitHub integration, marketplace, OIDC | Vendor-locked to GitHub               |
+| GitLab CI        | Built into GitLab, full DevOps platform    | Locked to GitLab                      |
+| Jenkins          | Self-hosted, huge plugin ecosystem         | Maintenance burden, dated UI          |
+| CircleCI         | Mature, fast, good Docker support          | Separate billing                      |
+| Azure DevOps     | Enterprise integration, board + repo + CI  | Heavier UI, fewer marketplace actions |
+
+If your code lives in GitHub, Actions is the obvious default.
+
+## Q45. How do you migrate from Jenkins to GitHub Actions?
+
+**Answer:**
+
+1. Pick one Jenkinsfile to start with.
+2. Map stages → jobs, steps → steps.
+3. Replace plugins with marketplace actions (e.g., AWS, Slack).
+4. Move credentials from Jenkins to repo secrets (or OIDC).
+5. Replace agents/labels with `runs-on:` and self-hosted runners if needed.
+6. Run both in parallel for a while; cut over once green.
+
+---
+
+## 14. Troubleshooting and Best Practices
+
+## Q46. Flaky CI — how do you fix it?
+
+**Answer:**
+
+1. Identify which tests are flaky (track failure rates).
+2. Quarantine them so the pipeline stays green.
+3. Fix or delete them.
+4. Common causes: shared global state, timing assumptions, network calls in unit tests, non-deterministic ordering.
+5. Use deterministic test data and seed RNGs.
+
+`Retry on flake` should be the last resort, not the cure.
+
+## Q47. How do you debug a failing workflow?
+
+**Answer:**
 
 ```yaml
-- name: Debug
-  run: |
-    echo "::group::env"
-    env | sort
-    echo "::endgroup::"
-    echo "::group::context"
-    echo '${{ toJSON(github) }}'
-    echo "::endgroup::"
-
 # Re-run with debug logs
-# Set repo secret ACTIONS_RUNNER_DEBUG=true and ACTIONS_STEP_DEBUG=true
+# Set repo secrets:
+#   ACTIONS_RUNNER_DEBUG=true
+#   ACTIONS_STEP_DEBUG=true
+# Then re-run the failed job; logs are far more verbose.
 ```
 
-`act` can run Actions locally for fast iteration: `act -j build`.
+Or open an interactive shell on the runner using `mxschmitt/action-tmate`:
 
-For interactive debugging: `mxschmitt/action-tmate` opens an SSH session into the runner (use cautiously, never on protected branches with secrets).
+```yaml
+- name: Debug shell on failure
+  if: failure()
+  uses: mxschmitt/action-tmate@v3
+  with:
+    limit-access-to-actor: true
+```
 
----
+## Q48. How do you speed up pipelines?
 
-### Q48. Speeding up pipelines?
+**Answer:**
 
-1. **Cache** — package managers, build artifacts, Docker layers.
-2. **Parallelize** — split jobs, shard tests.
-3. **Skip on no-op paths** — `paths-ignore`, monorepo affected detection.
-4. **Concurrency cancellation** — drop superseded runs.
-5. **Smaller images / shallow clones** for runner setup.
-6. **Larger runners** — paid tier; 8/16 vCPU cuts CPU-bound jobs.
-7. **Avoid setup steps repeated across jobs** — build once, reuse via artifacts.
-8. **Pre-warm self-hosted runners** with deps already installed.
+1. Cache dependencies (npm, pip, gradle, cargo).
+2. Use BuildKit caching for Docker images.
+3. Run jobs in parallel; use matrix and sharding.
+4. Skip unchanged paths with `paths:` filters.
+5. Use `concurrency` to cancel superseded runs.
+6. Choose smaller base images for build steps.
+7. Move integration tests to a separate workflow that runs less often.
+8. Profile your slow steps — sometimes one `npm install` dominates.
 
----
+## Q49. What CI metrics should you monitor?
 
-### Q49. Monitoring CI metrics?
+**Answer:**
 
-**Track:**
-- Pipeline duration (P50/P95).
-- Failure rate per workflow.
-- Flake rate per test.
-- Mean time to recovery (MTTR) on red main.
-- Deploy frequency, lead time for changes (DORA).
+1. **Pipeline duration (p50, p95)** — slow pipelines hurt productivity.
+2. **Pipeline success rate** — too many failures means flaky tests or process issues.
+3. **Time to merge** — from PR open to merge.
+4. **DORA metrics** — deployment frequency, lead time, change failure rate, MTTR.
+5. **Actions minutes consumed** — for cost management.
 
-GitHub provides workflow run history; export via `gh run list --json` or third-party (Allstar, CircleCI Insights-style dashboards).
+GitHub now exposes some of these via the Insights tab and the workflow run API.
 
----
+## Q50. What goes into a deployment runbook?
 
-### Q50. Deployment runbook essentials?
+**Answer:**
 
-- Pipeline visible to all engineers.
-- Clear ownership per environment.
-- Pre-merge: lint, test, build, scan.
-- Pre-deploy: integration tests on staging.
-- Deploy: gated on environment approval (production).
-- Post-deploy: smoke tests, synthetic checks, error/latency monitors.
-- Rollback procedure documented and rehearsed.
-- Incident communication channel.
+A runbook is the document a tired on-caller reads at 3 AM. It should include:
 
----
+1. What this service does.
+2. How to deploy and roll back.
+3. Health-check URLs and key dashboards.
+4. Common failure modes and their remediation.
+5. Escalation paths and contacts.
+6. Database migration procedures.
+7. Where logs and metrics live.
 
-### Q51. Common GitHub Actions pitfalls?
+## Q51. What are common GitHub Actions pitfalls?
 
-1. Using mutable tags (`@v4`) instead of SHAs for third-party actions.
-2. `pull_request_target` with checkout of PR code (RCE risk).
-3. Echoing secrets via base64 or after string transforms (unmasked).
-4. Running `npm install` instead of `npm ci` (non-reproducible).
-5. Storing build state in `node_modules` cache (corruption — cache the package store).
-6. Forgetting `permissions:` (default may be too broad).
-7. No concurrency control — old PR runs queue up.
-8. Single huge workflow — slow to debug; split into focused jobs.
-9. Long-lived AWS keys instead of OIDC.
-10. Self-hosted runners exposed to fork PRs.
-11. Not pinning `ubuntu-latest` for reproducibility (tag changes underneath you).
-12. No artifact retention strategy — runs out of space, history lost.
+**Answer:**
 
----
+1. Using `pull_request_target` and checking out PR code (security hole).
+2. Storing long-lived AWS keys instead of using OIDC.
+3. Not pinning third-party actions to SHAs.
+4. No `concurrency` block — duplicate runs cost minutes.
+5. No `permissions:` block — `GITHUB_TOKEN` defaults are too broad.
+6. Building Docker images without caching.
+7. Running everything on every push, even unrelated changes.
+8. Storing secrets in workflow YAML (visible in Git history).
 
-### Q52. Senior-level CI/CD checklist?
+## Q52. What is a sensible CI/CD checklist?
 
-- [ ] Pipeline as code, versioned with project.
-- [ ] All third-party actions pinned to SHAs; Dependabot updates them.
-- [ ] OIDC for cloud auth — no long-lived secrets.
-- [ ] Environments with required reviewers for prod.
-- [ ] Branch protection: required checks, PR reviews, signed commits.
-- [ ] Concurrency control on workflows.
-- [ ] Caching configured for fast builds.
-- [ ] Reusable workflows / composite actions for DRY.
-- [ ] Container images built with BuildKit + cache + multi-arch.
-- [ ] Image scanning gates merges.
-- [ ] Deployment strategy chosen (rolling/blue-green/canary) with automated rollback.
-- [ ] Feature flags for risky changes.
-- [ ] Pipeline metrics tracked (DORA).
-- [ ] Runbooks for incidents and rollback.
-- [ ] Self-hosted runners (if any) ephemeral, isolated, never running fork PRs.
-- [ ] Secret scanning enabled (push protection).
+**Answer:**
+
+- Every PR runs lint, tests, build, and security scans.
+- Concurrency cancels superseded runs.
+- Caches keyed by lockfile hashes.
+- Permissions block scoped to least privilege.
+- Cloud auth via OIDC, not static keys.
+- Third-party actions pinned to SHA.
+- Branch protection on `main` requires green CI and review.
+- Environments configured with required reviewers for production.
+- Deploys are idempotent and have a one-command rollback.
+- Docker images built with BuildKit cache and scanned for CVEs.
+- Pipeline runs in well under 15 minutes.
+- Runbook documented for every deploy target.
