@@ -1,4 +1,3 @@
-````md
 # Full Stack Developer (Mid-Level) Interview Preparation
 
 ## Focus: React.js, Next.js, Node.js, PostgreSQL, API Design, Security, UI/UX, Git, System Design, Debugging
@@ -114,7 +113,6 @@ function outer() {
 }
 const counter = outer();
 ```
-````
 
 **Use cases:** private state, callbacks, function factories, memoization.
 
@@ -2428,7 +2426,3 @@ I start from fundamentals, build a small working example, read official document
 You should hire me because I bring structured problem solving, strong backend fundamentals, and a growing full stack mindset. I care about clean code, secure systems, and user-focused implementation. I can contribute technically from day one, learn fast where needed, and work responsibly with both product and engineering teams. I am not just interested in writing code, I am interested in building reliable products that create real value.
 
 ---
-
-```
-
-```
