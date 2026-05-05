@@ -6,7 +6,7 @@ This is a merged reference combining strategic preparation, deep Laravel Q&A, an
 
 # PART 1 — Strategic Preparation, Mock Interview & 7-Day Plan
 
-# Full-Stack Developer Interview Preparation
+## Full-Stack Developer Interview Preparation
 
 **Role:** Full-Stack Developer — Laravel & Vue.js
 
@@ -1395,7 +1395,7 @@ If you can confidently explain these, you will be well prepared for this intervi
 
 ---
 
-# Final One-Minute Self Introduction
+## Final One-Minute Self Introduction
 
 ```text
 Assalamu Alaikum. I am a full-stack developer with experience in backend API development, relational database design, and frontend integration. I mainly work with Laravel/PHP for backend and Vue.js for frontend. I can build complete features including database schema, REST API, validation, authentication, and frontend API integration. I also focus on debugging, performance optimization, and writing clean maintainable code. I am interested in this role because it matches my skills in Laravel, Vue.js, MySQL, and full-stack product development.
@@ -1405,7 +1405,7 @@ Assalamu Alaikum. I am a full-stack developer with experience in backend API dev
 
 # PART 2 — Deep Laravel Q&A Reference
 
-# Full-Stack Developer Interview Preparation — Complete Q&A Guide
+## Full-Stack Developer Interview Preparation — Complete Q&A Guide
 
 **Role:** Full-Stack Developer — Laravel & Vue.js  
 **Focus:** Laravel, PHP, Raw PHP, Vue 3, JavaScript/TypeScript, MySQL, REST API, debugging, performance, scalability
@@ -1422,7 +1422,7 @@ Your target in the interview is simple:
 
 ---
 
-# 1. Interview Self-Introduction
+## 1. Interview Self-Introduction
 
 ## Q1. Tell me about yourself.
 
@@ -1452,7 +1452,7 @@ I have worked on systems where users can create, update, search, filter, and man
 
 ---
 
-# 2. Laravel Core Questions
+## 2. Laravel Core Questions
 
 ## Q1. What is Laravel?
 
@@ -1669,7 +1669,7 @@ use SoftDeletes;
 
 ---
 
-# 3. Laravel Relationships
+## 3. Laravel Relationships
 
 ## Q1. What are Eloquent relationships?
 
@@ -1784,7 +1784,7 @@ A polymorphic relationship allows one model to belong to multiple model types. E
 
 ---
 
-# 4. Laravel Validation, Request, Response
+## 4. Laravel Validation, Request, Response
 
 ## Q1. How do you validate request data in Laravel?
 
@@ -1870,7 +1870,7 @@ Because raw models may expose unnecessary fields, internal columns, or relations
 
 ---
 
-# 5. Laravel Authentication and Security
+## 5. Laravel Authentication and Security
 
 ## Q1. What authentication methods are common in Laravel APIs?
 
@@ -1958,7 +1958,7 @@ Rate limiting restricts how many requests a user can make in a given time. It he
 
 ---
 
-# 6. Laravel Performance and Scalability
+## 6. Laravel Performance and Scalability
 
 ## Q1. How do you improve Laravel performance?
 
@@ -2029,7 +2029,7 @@ Use Laravel Debugbar, Telescope, query logs, database `EXPLAIN`, slow query logs
 
 ---
 
-# 7. Laravel Version Differences
+## 7. Laravel Version Differences
 
 ## Q1. What Laravel versions are commonly seen in projects?
 
@@ -2075,7 +2075,7 @@ Check PHP version, composer dependencies, breaking changes, package compatibilit
 
 ---
 
-# 8. Raw PHP Interview Questions
+## 8. Raw PHP Interview Questions
 
 ## Q1. What is PHP?
 
@@ -2278,7 +2278,7 @@ try {
 
 ---
 
-# 9. Vue.js Core Questions
+## 9. Vue.js Core Questions
 
 ## Q1. What is Vue.js?
 
@@ -2501,7 +2501,7 @@ async function fetchData() {
 
 ---
 
-# 10. Vue Version Differences
+## 10. Vue Version Differences
 
 ## Q1. Vue 2 vs Vue 3 main differences?
 
@@ -2595,7 +2595,7 @@ Yes, I understand Vue 3 concepts like Composition API, `ref`, `reactive`, `compu
 
 ---
 
-# 11. JavaScript and TypeScript Questions
+## 11. JavaScript and TypeScript Questions
 
 ## Q1. Difference between `var`, `let`, and `const`?
 
@@ -2731,7 +2731,7 @@ const name = user.name ?? "Unknown";
 
 ---
 
-# 12. REST API Questions
+## 12. REST API Questions
 
 ## Q1. What is REST API?
 
@@ -2832,7 +2832,7 @@ Use HTTPS, authentication tokens, authorization checks, input validation, rate l
 
 ---
 
-# 13. SQL and MySQL Common Questions
+## 13. SQL and MySQL Common Questions
 
 ## Q1. What is SQL?
 
@@ -3088,7 +3088,7 @@ For this job, MySQL is more important because the job post mentions relational d
 
 ---
 
-# 14. Practical SQL Questions with Answers
+## 14. Practical SQL Questions with Answers
 
 ## Q1. Find all active users.
 
@@ -3176,7 +3176,7 @@ WHERE status = 'inactive';
 
 ---
 
-# 15. Full-Stack Laravel + Vue Practical Questions
+## 15. Full-Stack Laravel + Vue Practical Questions
 
 ## Q1. How would you build a product CRUD feature?
 
@@ -3262,7 +3262,7 @@ Use tables like users, roles, permissions, role_user, and permission_role. In La
 
 ---
 
-# 16. Debugging Questions
+## 16. Debugging Questions
 
 ## Q1. Laravel returns 500 error. What do you check?
 
@@ -3326,7 +3326,7 @@ Check logs first, reproduce carefully, avoid changing data manually without back
 
 ---
 
-# 17. OOP and Design Questions
+## 17. OOP and Design Questions
 
 ## Q1. What are the four pillars of OOP?
 
@@ -3398,7 +3398,7 @@ DTO means Data Transfer Object. It carries structured data between layers withou
 
 ---
 
-# 18. Git and Teamwork Questions
+## 18. Git and Teamwork Questions
 
 ## Q1. What is Git?
 
@@ -3456,7 +3456,7 @@ Run the project, test the feature, check formatting, run tests if available, rev
 
 ---
 
-# 19. Critical Laravel Coding Tasks They May Ask
+## 19. Critical Laravel Coding Tasks They May Ask
 
 ## Task 1. Create a REST API endpoint to store product.
 
@@ -3581,7 +3581,7 @@ onMounted(fetchProducts);
 
 ---
 
-# 20. Common HR + Technical Mixed Questions
+## 20. Common HR + Technical Mixed Questions
 
 ## Q1. Are you comfortable working on-site?
 
@@ -3627,7 +3627,7 @@ The job post mentions BDT 40,000–50,000. Based on my skills and experience, I 
 
 ---
 
-# 21. Must-Know Short Questions
+## 21. Must-Know Short Questions
 
 ## Laravel Short Answers
 
@@ -3678,7 +3678,7 @@ The job post mentions BDT 40,000–50,000. Based on my skills and experience, I 
 
 ---
 
-# 22. Scenario-Based Questions
+## 22. Scenario-Based Questions
 
 ## Q1. A page is loading slowly. What will you do?
 
@@ -3712,7 +3712,7 @@ I first understand current behavior, check related APIs/components/tables, make 
 
 ---
 
-# 23. Questions You Can Ask the Interviewer
+## 23. Questions You Can Ask the Interviewer
 
 Ask 2–3 good questions near the end.
 
@@ -3725,7 +3725,7 @@ Ask 2–3 good questions near the end.
 
 ---
 
-# 24. Final 2-Day Preparation Plan
+## 24. Final 2-Day Preparation Plan
 
 ## Day 1 — Backend Heavy
 
@@ -3767,7 +3767,7 @@ Practice:
 
 ---
 
-# 25. Final Interview Checklist
+## 25. Final Interview Checklist
 
 Before the interview, make sure you can explain:
 
@@ -3789,7 +3789,7 @@ Before the interview, make sure you can explain:
 
 ---
 
-# 26. Emergency Quick Revision
+## 26. Emergency Quick Revision
 
 ## Backend explanation in one line
 
@@ -3809,7 +3809,7 @@ For a feature, I design the table, create migration/model/controller/API, valida
 
 ---
 
-# 27. High-Probability Questions for This Specific Job
+## 27. High-Probability Questions for This Specific Job
 
 These are the questions most likely to appear based on the job post.
 
@@ -3845,7 +3845,7 @@ I reproduce the bug first, identify whether it is frontend, backend, database, o
 
 ---
 
-# 28. Things Not to Miss
+## 28. Things Not to Miss
 
 - Do not confuse Vue 2 and Vue 3 syntax.
 - Do not say `computed` and `watch` are the same.
@@ -3861,7 +3861,7 @@ I reproduce the bug first, identify whether it is frontend, backend, database, o
 
 ---
 
-# 29. Final Confidence Script
+## 29. Final Confidence Script
 
 Use this mindset before entering the interview:
 
@@ -3877,7 +3877,7 @@ Good luck. Focus on practical confidence, not memorized theory.
 
 # PART 3 — 500 Questions Across PHP, Laravel, Vue, JS/TS, MySQL, REST API, Git, Linux
 
-# Full-Stack Developer Interview Preparation
+## Full-Stack Developer Interview Preparation
 
 ## 500 Questions & Answers
 
