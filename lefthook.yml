@@ -1,0 +1,10 @@
+pre-commit:
+  jobs:
+    - name: devwizard-checks
+      run: bash .lefthook/devwizard-checks.sh pre-commit
+
+pre-push:
+  jobs:
+    - name: devwizard-checks
+      run: bash .lefthook/devwizard-checks.sh pre-push
+      use_stdin: true
