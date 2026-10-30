@@ -1,0 +1,10 @@
+pre-commit:
+  scripts:
+    "devwizard.sh":
+      runner: bash
+
+pre-push:
+  scripts:
+    "devwizard.sh":
+      runner: bash
+      use_stdin: true
